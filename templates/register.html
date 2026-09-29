@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Register | Queue-Free Print</title>
+
+    <link rel="stylesheet" href="../static/register.css">
+
+    <link rel="stylesheet" href="../static/responsive.css">
+</head>
+
+
+<body>
+
+
+    <!-- =========================
+         REGISTER SECTION
+    ========================= -->
+
+    <section class="register-section">
+
+        <div class="register-box">
+
+
+            <h1>Create Account</h1>
+
+            <p>
+                Choose your account type to register.
+            </p>
+
+            {% if error %}
+            <p class="form-error">{{ error }}</p>
+            {% endif %}
+
+
+            <!-- =========================
+                 ACCOUNT TYPE
+            ========================= -->
+
+            <div class="role-options">
+
+
+                <!-- USER -->
+
+                <label class="role">
+
+                    <input
+                        type="radio"
+                        name="role"
+                        value="user"
+                        checked
+                    >
+
+                    <span>🎓</span>
+
+                    <strong>User</strong>
+
+                </label>
+
+
+                <!-- ADMIN -->
+
+                <label class="role">
+
+                    <input
+                        type="radio"
+                        name="role"
+                        value="admin"
+                    >
+
+                    <span>👨‍💼</span>
+
+                    <strong>Admin</strong>
+
+                </label>
+
+            </div>
+
+
+            <!-- =========================
+                 REGISTRATION FORM
+            ========================= -->
+
+            <form action="/register" method="POST">
+
+                <input type="hidden" name="role" id="register-role" value="user">
+
+                <!-- FULL NAME -->
+
+                <label>
+                    Full Name
+                    <span class="required">*</span>
+                </label>
+
+                <input
+                    type="text"
+                    name="name"
+                    placeholder="Enter your full name"
+                    required
+                >
+
+
+                <!-- EMAIL -->
+
+                <label>
+                    Email
+                    <span class="required">*</span>
+                </label>
+
+                <input
+                    type="email"
+                    name="email"
+                    placeholder="Enter your email"
+                    required
+                >
+
+
+                <!-- PHONE NUMBER -->
+
+                <label>
+                    Phone Number
+                    <span class="required">*</span>
+                </label>
+
+                <input
+                    type="tel"
+                    name="phone"
+                    placeholder="Enter your phone number"
+                    pattern="[0-9]{10}"
+                    maxlength="10"
+                    required
+                >
+
+
+                <!-- SHOP LOCATION / SHOP DETAILS (ADMIN ONLY) -->
+                <div id="shop-location-fields" style="display:none;">
+                    <label>State <span class="required">*</span></label>
+                    <select name="state" id="register-state">
+                        <option value="">Select State</option>
+                        {% set states = ["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh","Puducherry","Chandigarh"] %}
+                        {% for st in states %}<option value="{{ st }}" {% if form_data.get('state') == st %}selected{% endif %}>{{ st }}</option>{% endfor %}
+                    </select>
+
+                    <label>University / College Name</label>
+                    <input type="text" name="university_name" value="{{ form_data.get('university_name','') }}" placeholder="Enter university / college name">
+
+                    <label>Shop Name <span class="required">*</span></label>
+                    <input type="text" name="shop_name" value="{{ form_data.get('shop_name','') }}" placeholder="Enter shop name">
+
+                    <label>GST Number <span class="required">*</span></label>
+                    <input type="text"
+                           name="gst_number"
+                           id="register-gst"
+                           value="{{ form_data.get('gst_number','') }}"
+                           placeholder="Enter 15-character GSTIN"
+                           maxlength="15"
+                           pattern="[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][A-Za-z0-9]Z[A-Za-z0-9]"
+                           style="text-transform: uppercase;">
+                </div>
+
+                <!-- =========================
+                     SHOP ID
+                ========================= -->
+
+                <div id="shop-id-field">
+
+                    <label>
+                        Shop ID / Shop Number
+                        <span class="required">*</span>
+                    </label>
+
+                    <input
+                        type="number"
+                        name="shop_id"
+                        id="shop-id"
+                        value="{{ form_data.get('shop_id', '') }}"
+                        placeholder="e.g. 5 (new Shop ID)"
+                        min="1"
+                    >
+
+                    <small class="shop-id-example">Example: 5</small>
+
+                </div>
+
+
+                <!-- PASSWORD -->
+
+                <label>
+                    Password
+                    <span class="required">*</span>
+                </label>
+
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Create your password"
+                    required
+                >
+
+
+                <!-- CONFIRM PASSWORD -->
+
+                <label>
+                    Confirm Password
+                    <span class="required">*</span>
+                </label>
+
+                <input
+                    type="password"
+                    name="confirm_password"
+                    placeholder="Confirm your password"
+                    required
+                >
+
+
+                <!-- REGISTER BUTTON -->
+
+                <button type="submit">
+                    Register
+                </button>
+
+            </form>
+
+
+            <!-- =========================
+                 LOGIN
+            ========================= -->
+
+            <p class="login-text">
+
+                Already have an account?
+
+                <a href="index.html">
+                    Login here
+                </a>
+
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =========================
+         JAVASCRIPT
+    ========================= -->
+
+    <script>
+
+        const userOption = document.querySelector(
+            'input[name="role"][value="user"]'
+        );
+
+        const adminOption = document.querySelector(
+            'input[name="role"][value="admin"]'
+        );
+
+        const shopField = document.getElementById(
+            "shop-id-field"
+        );
+
+        const shopInput = document.getElementById(
+            "shop-id"
+        );
+
+        const shopLocationFields = document.getElementById(
+            "shop-location-fields"
+        );
+
+        const registerState = document.getElementById(
+            "register-state"
+        );
+
+        const universityInput = document.querySelector(
+            'input[name="university_name"]'
+        );
+
+        const shopNameInput = document.querySelector(
+            'input[name="shop_name"]'
+        );
+
+        const gstInput = document.getElementById(
+            "register-gst"
+        );
+
+
+        /* =========================
+           TOGGLE ADMIN SHOP FIELDS
+        ========================= */
+
+        function toggleShopId() {
+
+            const isAdmin = adminOption.checked;
+
+            if (isAdmin) {
+
+                shopField.style.display = "block";
+                shopLocationFields.style.display = "block";
+
+                shopInput.required = true;
+                registerState.required = true;
+                universityInput.required = false;
+                shopNameInput.required = true;
+                gstInput.required = true;
+
+            } else {
+
+                shopField.style.display = "none";
+                shopLocationFields.style.display = "none";
+
+                shopInput.required = false;
+                registerState.required = false;
+                universityInput.required = false;
+                shopNameInput.required = false;
+                gstInput.required = false;
+
+                shopInput.value = "";
+                registerState.value = "";
+                universityInput.value = "";
+                shopNameInput.value = "";
+                gstInput.value = "";
+
+            }
+
+        }
+
+
+        /* USER CLICK */
+
+        userOption.addEventListener(
+            "change",
+            toggleShopId
+        );
+
+
+        /* ADMIN CLICK */
+
+        adminOption.addEventListener(
+            "change",
+            toggleShopId
+        );
+
+
+        /* =========================
+           KEEP SELECTED ROLE IN FORM
+        ========================= */
+
+        const registerRole = document.getElementById("register-role");
+
+        userOption.addEventListener("change", function () {
+            registerRole.value = "user";
+        });
+
+        adminOption.addEventListener("change", function () {
+            registerRole.value = "admin";
+        });
+
+
+        /* =========================
+           PAGE LOAD
+        ========================= */
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            function () {
+
+                toggleShopId();
+
+            }
+        );
+
+    </script>
+
+
+</body>
+
+</html>

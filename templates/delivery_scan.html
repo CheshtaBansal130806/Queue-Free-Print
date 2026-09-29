@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QueueFree — Secure QR Delivery</title>
+<script src="https://unpkg.com/html5-qrcode" defer></script>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f6f8fb;color:#172033;min-height:100vh}
+.wrap{max-width:760px;margin:0 auto;padding:32px 18px}.card{background:#fff;border:1px solid #e5e9f0;border-radius:20px;padding:28px;box-shadow:0 12px 35px rgba(20,35,60,.08)}
+h1{margin:0 0 8px;font-size:28px}.sub{color:#687386;margin:0 0 24px}.back{display:inline-block;margin-bottom:18px;text-decoration:none;color:#374151;font-weight:600}
+#reader{width:100%;max-width:520px;margin:0 auto;border-radius:14px;overflow:hidden}
+.result{margin-top:22px;padding:22px;border-radius:14px;border:1px solid #e2e7ef;background:#f9fafb}
+.result.ok{border-color:#b7e2c2;background:#f2fbf4}.result.bad{border-color:#f0c1c1;background:#fff5f5}
+.result h2{margin:0 0 8px}.small{font-size:13px;color:#6b7280;margin-top:12px;line-height:1.5}
+.scan-hidden{display:none!important}.result-back{display:inline-block;margin-top:18px;text-decoration:none;border:0;border-radius:10px;padding:12px 17px;background:#111827;color:#fff;font-weight:600}
+</style>
+<link rel="stylesheet" href="../static/responsive.css">
+</head>
+<body>
+<div class="wrap">
+<a class="back" href="{{ url_for('user_dashboard') }}">← Back to Dashboard</a>
+<div class="card">
+<h1>Secure QR-Based Delivery</h1>
+<p class="sub">Scan the QR code printed on the front page of your QueueFree printout.</p>
+
+{% if result %}
+<div id="reader" class="scan-hidden"></div>
+<div id="result" class="result {{ 'ok' if result.success else 'bad' }}" aria-live="polite">
+<h2>{{ result.title }}</h2>
+<div>{{ result.message }}</div>
+</div>
+<a class="result-back" href="{{ url_for('user_dashboard') }}">← Back to Dashboard</a>
+{% else %}
+<div id="reader"></div>
+<p class="small">Scan the QR code using your camera. The verification result will remain on this page after scanning.</p>
+<div id="result" aria-live="polite"></div>
+{% endif %}
+</div>
+</div>
+<script>
+function showResult(r){
+ const box=document.getElementById("result");
+ if(!box)return;
+ box.className="result "+(r.success?"ok":"bad");
+ box.innerHTML="<h2>"+escapeHtml(r.title||"Verification")+"</h2><div>"+escapeHtml(r.message||"")+"</div>"+
+   '<a class="result-back" href="{{ url_for('user_dashboard') }}">← Back to Dashboard</a>';
+ const reader=document.getElementById("reader");
+ if(reader)reader.classList.add("scan-hidden");
+}
+function escapeHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function extractToken(value){
+ value=(value||"").trim();
+ try{
+   const u=new URL(value,window.location.origin);
+   const m=u.pathname.match(/\/verify-delivery\/([^/]+)/);
+   if(m)return m[1];
+   if(u.searchParams.get("token"))return u.searchParams.get("token");
+ }catch(e){}
+ return value;
+}
+let scanner=null;
+let scanLocked=false;
+async function verifyToken(token){
+ if(scanLocked)return;
+ if(!token){showResult({success:false,title:"Invalid QR Code",message:"No valid QueueFree QR code was detected."});return}
+ scanLocked=true;
+ if(scanner){try{await scanner.stop();}catch(e){}}
+ window.location.href="{{ url_for('verify_delivery', token='TOKEN_PLACEHOLDER') }}".replace("TOKEN_PLACEHOLDER",encodeURIComponent(token));
+}
+function onScanSuccess(decodedText){
+ if(scanLocked)return;
+ verifyToken(extractToken(decodedText));
+}
+window.addEventListener("DOMContentLoaded",()=>{
+ if(window.Html5Qrcode){
+   scanner=new Html5Qrcode("reader");
+   scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}},onScanSuccess,()=>{})
+     .catch(()=>showResult({success:false,title:"Camera Unavailable",message:"Camera access could not be started. Please allow camera access and open the Scan QR page again."}));
+ }
+});
+</script>
+</body>
+</html>

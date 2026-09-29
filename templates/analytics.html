@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Analytics | Queue-Free Print</title>
+
+    <link rel="stylesheet" href="../static/analytics.css">
+
+
+<script>
+/* Prevent browser back/BFCache from reopening a protected page after logout. */
+window.addEventListener("pageshow", async function (event) {
+    if (!event.persisted) return;
+
+    try {
+        const response = await fetch("{{ url_for('session_status') }}", {
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const data = await response.json();
+
+        if (!data.logged_in) {
+            window.location.replace("{{ url_for('home') }}");
+        }
+    } catch (e) {
+        window.location.replace("{{ url_for('home') }}");
+    }
+});
+</script>
+
+
+<script>
+/* Re-check authentication whenever this protected page is shown, including browser Back/BFCache. */
+(function () {
+    const homeUrl = "{{ url_for('home') }}";
+    const statusUrl = "{{ url_for('session_status') }}";
+
+    async function verifySession() {
+        try {
+            const response = await fetch(statusUrl, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache" }
+            });
+            const data = await response.json();
+
+            if (!data.logged_in) {
+                window.location.replace(homeUrl);
+            }
+        } catch (error) {
+            window.location.replace(homeUrl);
+        }
+    }
+
+    window.addEventListener("pageshow", verifySession);
+})();
+</script>
+<script src="{{ url_for('static', filename='notifications.js') }}" defer></script>
+
+    <link rel="stylesheet" href="../static/responsive.css">
+</head>
+
+<body data-user-role="admin">
+
+
+    <!-- =========================
+     NAVBAR
+========================= -->
+
+    <nav>
+    <div class="logo">Queue-Free <span>Print</span></div>
+    <div class="nav-links">
+        <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('admin_dashboard') }}#orders">Orders</a>
+        <a href="{{ url_for('analytics') }}" class="active">Analytics</a>
+        <a href="{{ url_for('settings') }}">Settings</a>
+        <a class="notification-link" href="#" onclick="qfpOpenNotifications(event)">Notifications <span class="notification-badge" id="notificationBadge" hidden>0</span></a>
+        <a href="#" onclick="confirmLogout(event)">Logout</a>
+    </div>
+</nav>
+
+
+    <!-- =========================
+     ANALYTICS
+========================= -->
+
+    <main class="analytics-page">
+
+
+        <!-- HEADER -->
+
+        <div class="analytics-header">
+
+            <div>
+
+                <h1>Analytics</h1>
+
+                <p>
+                    Overview of your shop's printing activity and orders.
+                </p>
+
+            </div>
+
+            <div class="date-filter">
+
+                <label for="analyticsMonth">
+                    Select Month
+                </label>
+
+                <input type="month" id="analyticsMonth">
+
+            </div>
+
+        </div>
+
+
+        <!-- =========================
+         SUMMARY CARDS
+    ========================= -->
+
+        <div class="summary-grid">
+
+
+            <div class="summary-card">
+
+                <div class="summary-icon">
+                    🖨️
+                </div>
+
+                <div>
+
+                    <span>
+                        Total Orders
+                    </span>
+
+                    <h2 id="totalOrders">0</h2>
+
+                    <p>
+                        This month
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="summary-card">
+
+                <div class="summary-icon">
+                    💰
+                </div>
+
+                <div>
+
+                    <span>
+                        Total Revenue
+                    </span>
+
+                    <h2 id="totalRevenue">₹0.00</h2>
+
+                    <p>
+                        This month
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="summary-card">
+
+                <div class="summary-icon">
+                    📄
+                </div>
+
+                <div>
+
+                    <span>
+                        Pages Printed
+                    </span>
+
+                    <h2 id="pagesPrinted">0</h2>
+
+                    <p>
+                        This month
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =========================
+         PRINTING ACTIVITY + PEAK HOURS
+    ========================= -->
+
+        <div class="analytics-grid">
+
+            <div class="analytics-card">
+
+                <div class="card-heading">
+                    <div>
+                        <h2>Printing Activity</h2>
+                        <p>Number of printing orders received each day.</p>
+                    </div>
+                    <div class="activity-controls">
+                        <div class="period-toggle" id="activityPeriod">
+                            <button type="button" class="period-btn active" data-period="month">1 Month</button>
+                            <button type="button" class="period-btn" data-period="week">1 Week</button>
+                        </div>
+                        <select id="activityView">
+                        <option value="orders">Orders</option>
+                        <option value="revenue">Revenue</option>
+                        <option value="pages">Pages Printed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="chart">
+                    <div class="chart-y" id="chartYLabels">
+                        <span>0</span>
+                        <span>0</span>
+                        <span>0</span>
+                    </div>
+                    <div class="chart-area">
+                        <div class="grid-line"></div>
+                        <div class="grid-line"></div>
+                        <div class="grid-line"></div>
+                        <div class="grid-line"></div>
+                        <div class="grid-line"></div>
+                        <div class="bars" id="activityBars"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="analytics-card">
+
+                <div class="card-heading">
+                    <div>
+                        <h2>Peak Hours</h2>
+                        <p>Orders received according to time.</p>
+                    </div>
+                </div>
+
+                <div class="peak-hours" id="peakHours"></div>
+
+                <div class="peak-highlight" id="peakHighlight">
+                    <span>🔥</span>
+                    <div>
+                        <strong>Peak Time: No orders</strong>
+                        <p>No printing orders were received in the selected month.</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- =================================================
+         ONLY PRINTING TYPE + ORDER STATUS ARE SIDE BY SIDE
+    ================================================== -->
+
+        <div class="printing-status-row">
+
+            <div class="analytics-card printing-type-block">
+
+                <div class="card-heading">
+                    <div>
+                        <h2>Printing Type</h2>
+                        <p>Distribution of printing orders.</p>
+                    </div>
+                </div>
+
+                <div class="type-list">
+                    <div class="type-item">
+                        <div class="type-row">
+                            <div class="type-name">
+                                <span>⚫</span>
+                                <span>Black &amp; White</span>
+                            </div>
+                            <strong id="bwPercent">0%</strong>
+                        </div>
+                        <div class="type-progress">
+                            <div class="type-progress-fill" id="bwBar" style="width:0%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="type-item">
+                        <div class="type-row">
+                            <div class="type-name">
+                                <span>🌈</span>
+                                <span>Color</span>
+                            </div>
+                            <strong id="colorPercent">0%</strong>
+                        </div>
+                        <div class="type-progress">
+                            <div class="type-progress-fill" id="colorBar" style="width:0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="analytics-card order-status-block">
+
+                <div class="card-heading">
+                    <div>
+                        <h2>Order Status</h2>
+                        <p>Order statistics for the selected month.</p>
+                    </div>
+                </div>
+
+                <div class="status-grid">
+                    <div class="status-box">
+                        <span class="status-icon">✅</span>
+                        <div>
+                            <strong id="completedOrders">0</strong>
+                            <p>Completed</p>
+                        </div>
+                    </div>
+
+                    <div class="status-box">
+                        <span class="status-icon">❌</span>
+                        <div>
+                            <strong id="cancelledOrders">0</strong>
+                            <p>Cancelled</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="analytics-card daily-analytics-card">
+
+            <div class="card-heading">
+                <div>
+                    <h2>Daily Analytics</h2>
+                    <p>Days with orders in the selected month.</p>
+                </div>
+            </div>
+
+            <div class="daily-table-wrapper">
+                <table class="daily-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Day</th>
+                            <th>Orders</th>
+                            <th>Revenue</th>
+                            <th>Pages Printed</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dailyAnalyticsBody"></tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="2">Monthly Total</th>
+                            <th id="dailyTotalOrders">0</th>
+                            <th id="dailyTotalRevenue">₹0.00</th>
+                            <th id="dailyTotalPages">0</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            <div class="table-pagination">
+                <button type="button" id="dailyPrev">← Previous</button>
+                <span id="dailyPageInfo">1 / 1</span>
+                <button type="button" id="dailyNext">Next →</button>
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <!-- =====================================================
+     FOOTER
+===================================================== -->
+
+    <footer>
+
+
+        <div class="footer-content">
+
+
+            <div class="footer-column">
+
+                <h3>
+                    Queue-Free Print
+                </h3>
+
+                <p>
+                    Simple and convenient online printing
+                    system for college students.
+                </p>
+
+            </div>
+
+
+            <div class="footer-column">
+
+                <h3>
+                    Quick Links
+                </h3>
+
+                <a href="{{ url_for('admin_dashboard') }}">
+                    Dashboard
+                </a>
+
+                <a href="{{ url_for('admin_dashboard') }}#orders">
+                Orders
+            </a>
+
+                <a href="{{ url_for('analytics') }}">
+                    Analytics
+                </a>
+
+                <a href="{{ url_for('settings') }}">
+                    Settings
+                </a>
+
+            </div>
+
+
+        </div>
+
+
+        <div class="footer-bottom">
+
+            © 2026 Queue-Free Print | All Rights Reserved
+
+        </div>
+
+
+    </footer>
+
+
+    <!-- =========================
+     LOGOUT CONFIRMATION POPUP
+========================= -->
+
+    <div class="logout-overlay" id="logoutPopup">
+
+        <div class="logout-box">
+
+            <div class="logout-icon">
+                ?
+            </div>
+
+            <h2>
+                Logout Confirmation
+            </h2>
+
+            <p>
+                Are you sure you want to logout?
+            </p>
+
+            <div class="logout-buttons">
+
+                <button type="button" class="cancel-logout-btn" onclick="closeLogoutPopup()">
+                    Cancel
+                </button>
+
+                <button type="button" class="confirm-logout-btn" onclick="logoutUser()">
+                    Logout
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        function confirmLogout(event) {
+
+            event.preventDefault();
+
+            document.getElementById("logoutPopup").style.display = "flex";
+
+        }
+
+
+        function closeLogoutPopup() {
+
+            document.getElementById("logoutPopup").style.display = "none";
+
+        }
+
+
+        function logoutUser() {
+
+            window.location.href = "{{ url_for('logout') }}";
+
+        }
+
+
+        document.getElementById("logoutPopup").addEventListener("click", function (event) {
+
+            if (event.target === this) {
+
+                closeLogoutPopup();
+
+            }
+
+        });
+
+    </script>
+
+
+    <script>
+    (() => {
+        const monthInput = document.getElementById("analyticsMonth");
+        const activityView = document.getElementById("activityView");
+
+        function currentMonth() {
+            const now = new Date();
+            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        }
+
+        function money(value) {
+            return "₹" + Number(value || 0).toLocaleString("en-IN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, ch => ({
+                "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;"
+            }[ch]));
+        }
+
+        let currentDaily = [];
+        let currentMonthDaily = [];
+        let dailyPage = 1;
+        const dailyRowsPerPage = 5;
+        let activityPeriod = "month";
+
+        let currentWeek = [];
+
+        function getActivityData() {
+            return activityPeriod === "week" ? currentWeek : currentMonthDaily;
+        }
+
+        function renderChart(daily) {
+            const mode = activityView.value;
+            const bars = document.getElementById("activityBars");
+            const yLabels = document.getElementById("chartYLabels");
+            const chartData = getActivityData();
+            const values = chartData.map(d => Number(d[mode] || 0));
+            const max = Math.max(...values, 0);
+
+            const unit = mode === "revenue" ? "₹" : "";
+            yLabels.innerHTML = [max, max / 2, 0].map(v =>
+                `<span>${unit}${mode === "revenue" ? Number(v).toFixed(0) : Math.round(v).toLocaleString("en-IN")}</span>`
+            ).join("");
+
+            bars.innerHTML = chartData.map(d => {
+                const value = Number(d[mode] || 0);
+                const height = max ? Math.max((value / max) * 100, value ? 3 : 0) : 0;
+                const dateObj = new Date(d.date + "T00:00:00");
+                const dayName = dateObj.toLocaleDateString("en-US", { weekday: "short" });
+                const dateNumber = dateObj.getDate();
+                const display = mode === "revenue" ? money(value) : Number(value).toLocaleString("en-IN");
+                return `
+                    <div class="bar-item" title="${escapeHtml(dayName + " " + dateNumber)} — ${escapeHtml(d.date)}: ${escapeHtml(display)}">
+                        <div class="bar" style="height:${height}%;"></div>
+                        <span>${escapeHtml(dayName)}<br>${dateNumber}</span>
+                    </div>`;
+            }).join("");
+        }
+
+        function renderPeakHours(hours) {
+            const container = document.getElementById("peakHours");
+            container.innerHTML = hours.map(item => `
+                <div class="hour-row">
+                    <div class="hour-info">
+                        <span>${escapeHtml(item.label)}</span>
+                        <strong>${item.orders} orders</strong>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width:${item.percentage}%;"></div>
+                    </div>
+                </div>
+            `).join("");
+
+            const peak = hours.reduce((best, item) =>
+                item.orders > best.orders ? item : best,
+                {label:"No orders", orders:0}
+            );
+
+            document.getElementById("peakHighlight").innerHTML = `
+                <span>🔥</span>
+                <div>
+                    <strong>Peak Time: ${escapeHtml(peak.label)}</strong>
+                    <p>${peak.orders ? peak.orders + " orders were received during this period." :
+                        "No printing orders were received in the selected month."}</p>
+                </div>`;
+        }
+
+        function renderDaily(daily) {
+            // Daily Analytics shows only dates that actually have orders.
+            currentDaily = (daily || []).filter(d => Number(d.orders || 0) > 0);
+            const totalPages = Math.max(1, Math.ceil(currentDaily.length / dailyRowsPerPage));
+            if (dailyPage > totalPages) dailyPage = totalPages;
+
+            const startIndex = (dailyPage - 1) * dailyRowsPerPage;
+            const visible = currentDaily.slice(startIndex, startIndex + dailyRowsPerPage);
+            const body = document.getElementById("dailyAnalyticsBody");
+
+            body.innerHTML = visible.map(d => `
+                <tr>
+                    <td>${escapeHtml(d.date)}</td>
+                    <td>${escapeHtml(d.day)}</td>
+                    <td>${Number(d.orders || 0).toLocaleString("en-IN")}</td>
+                    <td>${money(d.revenue)}</td>
+                    <td>${Number(d.pages || 0).toLocaleString("en-IN")}</td>
+                </tr>`).join("");
+
+            // Monthly totals remain totals for the complete selected month.
+            const totals = currentDaily.reduce((a, d) => ({
+                orders: a.orders + Number(d.orders || 0),
+                revenue: a.revenue + Number(d.revenue || 0),
+                pages: a.pages + Number(d.pages || 0)
+            }), {orders:0, revenue:0, pages:0});
+
+            document.getElementById("dailyTotalOrders").textContent = totals.orders.toLocaleString("en-IN");
+            document.getElementById("dailyTotalRevenue").textContent = money(totals.revenue);
+            document.getElementById("dailyTotalPages").textContent = totals.pages.toLocaleString("en-IN");
+
+            document.getElementById("dailyPageInfo").textContent = `${dailyPage} / ${totalPages}`;
+            document.getElementById("dailyPrev").disabled = dailyPage <= 1;
+            document.getElementById("dailyNext").disabled = dailyPage >= totalPages;
+        }
+
+        async function loadAnalytics() {
+            const month = monthInput.value || currentMonth();
+            monthInput.value = month;
+
+            try {
+                const response = await fetch(`{{ url_for('analytics_data') }}?month=${encodeURIComponent(month)}`, {
+                    credentials: "same-origin",
+                    cache: "no-store"
+                });
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || "Could not load analytics.");
+                }
+
+                document.getElementById("totalOrders").textContent =
+                    Number(data.total_orders || 0).toLocaleString("en-IN");
+                document.getElementById("totalRevenue").textContent = money(data.total_revenue);
+                document.getElementById("pagesPrinted").textContent =
+                    Number(data.pages_printed || 0).toLocaleString("en-IN");
+
+                document.getElementById("bwPercent").textContent =
+                    `${data.printing_type.black_white}%`;
+                document.getElementById("bwBar").style.width =
+                    `${data.printing_type.black_white}%`;
+
+                document.getElementById("colorPercent").textContent =
+                    `${data.printing_type.color}%`;
+                document.getElementById("colorBar").style.width =
+                    `${data.printing_type.color}%`;
+
+                document.getElementById("completedOrders").textContent =
+                    Number(data.order_status.completed || 0).toLocaleString("en-IN");
+                document.getElementById("cancelledOrders").textContent =
+                    Number(data.order_status.cancelled || 0).toLocaleString("en-IN");
+
+                currentWeek = data.current_week || [];
+                currentMonthDaily = data.daily || [];
+                renderChart();
+                renderPeakHours(data.peak_hours);
+                renderDaily(data.daily);
+            } catch (error) {
+                console.error(error);
+                alert(error.message);
+            }
+        }
+
+        monthInput.value = currentMonth();
+
+        document.querySelectorAll(".period-btn").forEach(button => {
+            button.addEventListener("click", () => {
+                document.querySelectorAll(".period-btn").forEach(b => b.classList.remove("active"));
+                button.classList.add("active");
+                activityPeriod = button.dataset.period;
+                renderChart();
+            });
+        });
+
+        document.getElementById("dailyPrev").addEventListener("click", () => {
+            if (dailyPage > 1) {
+                dailyPage--;
+                renderDaily(currentDaily);
+            }
+        });
+
+        document.getElementById("dailyNext").addEventListener("click", () => {
+            if (dailyPage < Math.ceil(currentDaily.length / dailyRowsPerPage)) {
+                dailyPage++;
+                renderDaily(currentDaily);
+            }
+        });
+
+        monthInput.addEventListener("change", () => {
+            dailyPage = 1;
+            loadAnalytics();
+        });
+        activityView.addEventListener("change", () => renderChart(currentDaily));
+        loadAnalytics();
+    })();
+    </script>
+
+</body>
+
+</html>

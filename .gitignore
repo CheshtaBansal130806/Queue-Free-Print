@@ -1,0 +1,23 @@
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+*.pem
+.vapid_private.pem
+.vapid_public.txt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Runtime/generated data
+uploads/
+*.log
+
+# IDE/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

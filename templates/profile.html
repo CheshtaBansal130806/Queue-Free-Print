@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Profile | Queue-Free Print</title>
+
+    <link rel="stylesheet" href="../static/profile.css?v=20260912-0858">
+
+
+
+
+
+
+<script>
+/* Protected-page guard: after logout, browser Back/BFCache cannot keep
+   the profile page accessible without a valid server session. */
+(function () {
+    const homeUrl = "{{ url_for('home') }}";
+    const statusUrl = "{{ url_for('session_status') }}";
+
+    async function verifySession() {
+        try {
+            const response = await fetch(statusUrl, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: {
+                    "Cache-Control": "no-cache",
+                    "Pragma": "no-cache"
+                }
+            });
+
+            if (!response.ok) {
+                window.location.replace(homeUrl);
+                return;
+            }
+
+            const data = await response.json();
+
+            if (!data.logged_in || data.role !== "user") {
+                window.location.replace(homeUrl);
+            }
+        } catch (error) {
+            window.location.replace(homeUrl);
+        }
+    }
+
+    window.addEventListener("pageshow", verifySession);
+    verifySession();
+})();
+</script>
+    <script src="{{ url_for('static', filename='notifications.js') }}" defer></script>
+<script src="https://unpkg.com/html5-qrcode" defer></script>
+    <link rel="stylesheet" href="../static/responsive.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='nearby_shops.css') }}">
+    <script src="{{ url_for('static', filename='nearby_shops.js') }}" defer></script>
+</head>
+
+
+<body data-user-role="user">
+
+
+<!-- ==================================================
+     NAVBAR
+================================================== -->
+
+<nav>
+    <div class="logo">Queue-Free <span>Print</span></div>
+    <div class="nav-links">
+        <a href="{{ url_for('user_dashboard') }}#dashboard">Dashboard</a>
+        <a href="{{ url_for('delivery_scan') }}">Scan QR</a>
+        <a href="{{ url_for('recent_orders') }}">Recent Orders</a>
+        <a class="notification-link" href="#" onclick="qfpOpenNotifications(event)">Notifications <span class="notification-badge" id="notificationBadge" hidden>0</span></a>
+        <a href="{{ url_for('profile') }}" class="active">Profile</a>
+        <a href="#" onclick="confirmLogout(event)">Logout</a>
+    </div>
+</nav>
+
+
+
+<!-- ==================================================
+     PROFILE PAGE
+================================================== -->
+
+<main class="profile-page">
+        <button type="button" class="qfp-nearby-btn" id="qfpNearbyBtn" onclick="qfpOpenNearbyShops()">📍 Locate Nearby Shops</button>
+
+
+    <!-- ==================================================
+         WELCOME
+    ================================================== -->
+
+    <section class="profile-welcome">
+
+
+        <div class="profile-avatar">
+            👤
+        </div>
+
+
+        <div>
+
+            <h1>
+                My Profile
+            </h1>
+
+            <p>
+                Manage your account information and
+                printing activity.
+            </p>
+
+        </div>
+
+
+    </section>
+
+
+
+    <!-- ==================================================
+         PROFILE CONTENT
+    ================================================== -->
+
+    <div class="profile-layout">
+
+
+        <!-- ==================================================
+             PERSONAL INFORMATION
+        ================================================== -->
+
+        <section class="profile-card">
+
+
+            <div class="card-header">
+
+                <div>
+
+                    <h2>
+                        Personal Information
+                    </h2>
+
+                    <p>
+                        Update your account details.
+                    </p>
+
+                </div>
+
+
+                <span>
+                    👤
+                </span>
+
+            </div>
+
+
+
+            <form
+                onsubmit="saveProfile(event)"
+            >
+
+
+                <!-- NAME -->
+
+                <div class="form-group">
+
+                    <label>
+
+                        Full Name
+
+                        <span>*</span>
+
+                    </label>
+
+
+                    <input
+                        type="text"
+                        id="name"
+                        value="{{ profile_data.name|e }}"
+                        placeholder="Enter your full name"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- EMAIL -->
+
+                <div class="form-group">
+
+                    <label>
+
+                        Email
+
+                        <span>*</span>
+
+                    </label>
+
+
+                    <input
+                        type="email"
+                        id="email"
+                        value="{{ profile_data.email|e }}"
+                        placeholder="Enter your email"
+                        required
+                    >
+
+                </div>
+
+
+
+                <!-- PHONE -->
+
+                <div class="form-group">
+
+                    <label>
+                        Phone Number
+                    </label>
+
+
+                    <input
+                        type="tel"
+                        id="phone"
+                        value="{{ profile_data.phone or '' }}"
+                        placeholder="Enter your phone number"
+                    >
+
+                </div>
+
+
+
+                <!-- SAVE -->
+
+                <button
+                    type="submit"
+                    class="save-btn"
+                >
+
+                    Save Changes
+
+                </button>
+
+
+            </form>
+
+
+            <p
+                id="saveMessage"
+                class="save-message"
+            ></p>
+
+
+        </section>
+
+
+
+        <!-- ==================================================
+             ACCOUNT SUMMARY
+        ================================================== -->
+
+        <section class="profile-card summary-card">
+
+
+            <div class="card-header">
+
+                <div>
+
+                    <h2>
+                        Account Summary
+                    </h2>
+
+                    <p>
+                        Your printing activity.
+                    </p>
+
+                </div>
+
+
+                <span>
+                    📊
+                </span>
+
+            </div>
+
+
+
+            <div class="summary-items">
+
+
+                <!-- TOTAL ORDERS -->
+
+                <div class="summary-item">
+
+
+                    <div class="summary-icon">
+                        📋
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Total Orders
+                        </span>
+
+
+                        <strong id="summaryTotal">
+                            {{ summary.total }}
+                        </strong>
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- COMPLETED -->
+
+                <div class="summary-item">
+
+
+                    <div class="summary-icon">
+                        ✅
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Completed Orders
+                        </span>
+
+
+                        <strong id="summaryCompleted">
+                            {{ summary.completed }}
+                        </strong>
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- PENDING -->
+
+                <div class="summary-item">
+
+
+                    <div class="summary-icon">
+                        ⏳
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Pending Orders
+                        </span>
+
+
+                        <strong id="summaryPending">
+                            {{ summary.pending }}
+                        </strong>
+
+                    </div>
+
+
+                </div>
+
+
+
+                <!-- CANCELLED -->
+
+                <div class="summary-item">
+
+
+                    <div class="summary-icon">
+                        ❌
+                    </div>
+
+
+                    <div>
+
+                        <span>
+                            Cancelled Orders
+                        </span>
+
+
+                        <strong id="summaryCancelled">
+                            {{ summary.cancelled }}
+                        </strong>
+
+                    </div>
+
+
+                </div>
+
+
+            </div>
+
+
+        </section>
+
+
+    </div>
+
+
+
+    <!-- ==================================================
+         CHANGE PASSWORD
+    ================================================== -->
+
+    <section class="profile-card password-card">
+
+
+        <div class="card-header">
+
+            <div>
+
+                <h2>
+                    🔒 Change Password
+                </h2>
+
+                <p>
+                    Update your account password.
+                </p>
+
+            </div>
+
+        </div>
+
+
+
+        <form
+            onsubmit="changePassword(event)"
+        >
+
+
+            <div class="password-grid">
+
+
+                <div class="form-group">
+
+                    <label>
+
+                        Current Password
+
+                        <span>*</span>
+
+                    </label>
+
+
+                    <input
+                        type="password"
+                        id="currentPassword"
+                        placeholder="Enter current password"
+                        required
+                    >
+
+                </div>
+
+
+
+                <div class="form-group">
+
+                    <label>
+
+                        New Password
+
+                        <span>*</span>
+
+                    </label>
+
+
+                    <input
+                        type="password"
+                        id="newPassword"
+                        placeholder="Enter new password"
+                        required
+                    >
+
+                </div>
+
+
+
+                <div class="form-group">
+
+                    <label>
+
+                        Confirm New Password
+
+                        <span>*</span>
+
+                    </label>
+
+
+                    <input
+                        type="password"
+                        id="confirmPassword"
+                        placeholder="Confirm new password"
+                        required
+                    >
+
+                </div>
+
+
+            </div>
+
+
+
+            <button
+                type="submit"
+                class="password-btn"
+            >
+
+                Update Password
+
+            </button>
+
+
+        </form>
+
+
+        <p
+            id="passwordMessage"
+            class="password-message"
+        ></p>
+
+
+    </section>
+
+
+
+    <!-- ==================================================
+         BACK BUTTON
+    ================================================== -->
+
+    <div class="back-section">
+
+        <a
+            href="{{ url_for('user_dashboard') }}#dashboard"
+            class="back-btn"
+        >
+
+            ← Back to Dashboard
+
+        </a>
+
+    </div>
+
+
+</main>
+
+
+
+<!-- ==================================================
+     NOTIFICATION POPUP
+================================================== -->
+
+<div
+    class="notification-overlay"
+    id="notificationOverlay"
+>
+
+
+    <div class="notification-box">
+
+
+        <!-- NOTIFICATION HEADER -->
+
+        <div class="notification-header">
+
+
+            <div>
+
+                <h2>
+                    🔔 Notifications
+                </h2>
+
+                <p>
+                    Your latest order updates.
+                </p>
+
+            </div>
+
+
+            <button
+                class="notification-close"
+                onclick="closeNotifications()"
+            >
+
+                ✕
+
+            </button>
+
+
+        </div>
+
+
+
+        <!-- NOTIFICATION LIST -->
+
+        <div class="notification-list" id="notificationList"></div>
+
+        <!-- NO NOTIFICATION -->
+
+        <div
+            class="no-notification"
+            id="noNotification"
+            style="display: {{ 'none' if notifications else 'flex' }};"
+        >
+
+
+            <div>
+                🔕
+            </div>
+
+
+            <h3>
+                No Notifications
+            </h3>
+
+
+            <p>
+                You don't have any notifications right now.
+            </p>
+
+
+        </div>
+
+
+    </div>
+
+
+</div>
+
+
+
+<!-- ==================================================
+     LOGOUT CONFIRMATION POPUP
+================================================== -->
+
+<div class="logout-overlay" id="logoutPopup" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="logoutPopupTitle" aria-describedby="logoutPopupMessage">
+
+    <div class="logout-box">
+
+        <div class="logout-icon" aria-hidden="true">!</div>
+
+        <h2 id="logoutPopupTitle">Logout Confirmation</h2>
+
+        <p id="logoutPopupMessage">Are you sure you want to logout? After logging out, you will need to login again to access your account.</p>
+
+        <div class="logout-buttons">
+
+            <button
+                type="button"
+                class="cancel-logout-btn"
+                onclick="closeLogoutPopup()"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="button"
+                class="confirm-logout-btn"
+                onclick="logoutUser()"
+            >
+                Logout
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- ==================================================
+     GENERAL WARNING / MESSAGE POPUP
+================================================== -->
+<div class="warning-overlay" id="warningOverlay">
+    <div class="warning-box">
+        <div class="warning-icon" id="warningIcon">!</div>
+        <h2 id="warningTitle">Notice</h2>
+        <p id="warningMessage"></p>
+        <div class="warning-buttons">
+            <button type="button" class="warning-ok-btn" onclick="closeWarning()">OK</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ==================================================
+     FOOTER
+================================================== -->
+
+<footer>
+
+
+    <div class="footer-content">
+
+
+        <div class="footer-column">
+
+
+            <h3>
+                Queue-Free Print
+            </h3>
+
+
+            <p>
+                Simple and convenient online printing
+                system for college students.
+            </p>
+
+
+        </div>
+
+
+
+        <div class="footer-column">
+
+
+            <h3>
+                Quick Links
+            </h3>
+
+
+            <a href="{{ url_for('user_dashboard') }}#dashboard">
+                Dashboard
+            </a>
+
+
+            <a href="{{ url_for('user_dashboard') }}#new-order">
+                New Order
+            </a>
+
+
+            <a href="{{ url_for('recent_orders') }}">
+                Recent Orders
+            </a>
+
+
+            <a class="notification-link"
+                href="#"
+                onclick="qfpOpenNotifications(event)"
+            >
+                Notifications
+            </a>
+
+
+            <a href="{{ url_for('profile') }}">
+                Profile
+            </a>
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <div class="footer-bottom">
+
+        © 2026 Queue-Free Print |
+        All Rights Reserved
+
+    </div>
+
+
+</footer>
+
+
+
+<!-- ==================================================
+     JAVASCRIPT
+================================================== -->
+
+<script>
+
+
+/* ==================================================
+   SAVE PROFILE
+================================================== */
+
+function showWarning(message, title = "Notice", icon = "!") {
+    document.getElementById("warningTitle").textContent = title;
+    document.getElementById("warningMessage").textContent = message;
+    document.getElementById("warningIcon").textContent = icon;
+    document.getElementById("warningOverlay").style.display = "flex";
+}
+
+function closeWarning() {
+    document.getElementById("warningOverlay").style.display = "none";
+}
+
+function broadcastProfileUpdate(profile) {
+    try {
+        localStorage.setItem("qfp_profile_updated", JSON.stringify({
+            ...profile,
+            updatedAt: Date.now()
+        }));
+    } catch (e) {}
+
+    try {
+        if (window.BroadcastChannel) {
+            const channel = new BroadcastChannel("qfp_profile_channel");
+            channel.postMessage(profile);
+            channel.close();
+        }
+    } catch (e) {}
+}
+
+function saveProfile(event) {
+    event.preventDefault();
+
+    const form = new FormData();
+    form.append("name", document.getElementById("name").value.trim());
+    form.append("email", document.getElementById("email").value.trim());
+    form.append("phone", document.getElementById("phone").value.trim());
+
+    fetch("{{ url_for('update_profile') }}", {
+        method: "POST",
+        body: form,
+        credentials: "same-origin",
+        cache: "no-store"
+    })
+    .then(async r => {
+        let data;
+        try {
+            data = await r.json();
+        } catch (e) {
+            data = {success: false, error: "Invalid response received from server."};
+        }
+        return {ok: r.ok, data};
+    })
+    .then(({ok, data}) => {
+        if (!ok || !data.success) {
+            showWarning(data.error || "Profile could not be updated.", "Update Failed", "!");
+            return;
+        }
+
+        // Put the values returned directly from MySQL back into the form.
+        document.getElementById("name").value = data.name || "";
+        document.getElementById("email").value = data.email || "";
+        document.getElementById("phone").value = data.phone || "";
+
+        // Make the new name available immediately to every dashboard tab.
+        broadcastProfileUpdate({
+            name: data.name || "",
+            email: data.email || "",
+            phone: data.phone || ""
+        });
+
+        document.getElementById("saveMessage").innerText = "✓ Profile details updated successfully.";
+        setTimeout(() => { document.getElementById("saveMessage").innerText = ""; }, 3000);
+    })
+    .catch(() => showWarning("Server connection failed while saving your profile.", "Update Failed", "!"));
+}
+
+function changePassword(event) {
+    event.preventDefault();
+
+    const currentPassword = document.getElementById("currentPassword").value;
+    const newPassword = document.getElementById("newPassword").value;
+    const confirmPassword = document.getElementById("confirmPassword").value;
+
+    if (newPassword !== confirmPassword) {
+        showWarning("New password and confirm password do not match.", "Password Mismatch", "!");
+        return;
+    }
+
+    const form = new FormData();
+    form.append("current_password", currentPassword);
+    form.append("new_password", newPassword);
+
+    fetch("{{ url_for('change_profile_password') }}", { method: "POST", body: form })
+        .then(r => r.json().then(data => ({ok: r.ok, data})))
+        .then(({ok, data}) => {
+            if (!ok || !data.success) {
+                showWarning(data.error || "Password could not be updated.", "Password Update Failed", "!");
+                return;
+            }
+            document.getElementById("passwordMessage").innerText = "✓ Password updated successfully.";
+            event.target.reset();
+            setTimeout(() => { document.getElementById("passwordMessage").innerText = ""; }, 3000);
+        })
+        .catch(() => showWarning("Server connection failed while updating your password.", "Password Update Failed", "!"));
+}
+
+
+/* ==================================================
+   LIVE ACCOUNT SUMMARY
+================================================== */
+
+const summaryUrl = "{{ url_for('profile_summary') }}";
+
+async function refreshAccountSummary() {
+    try {
+        const response = await fetch(summaryUrl, {
+            method: "GET",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: {"X-Requested-With": "XMLHttpRequest"}
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.success) return;
+
+        document.getElementById("summaryTotal").textContent = data.total;
+        document.getElementById("summaryCompleted").textContent = data.completed;
+        document.getElementById("summaryPending").textContent = data.pending;
+        document.getElementById("summaryCancelled").textContent = data.cancelled;
+    } catch (e) {
+        // Keep the last displayed values if the temporary refresh fails.
+    }
+}
+
+// Update immediately when another page changes an order, then keep the
+// summary synchronized while this page is open.
+window.addEventListener("storage", function(event) {
+    if (event.key === "qfp_order_updated") refreshAccountSummary();
+});
+
+if (window.BroadcastChannel) {
+    try {
+        const orderChannel = new BroadcastChannel("qfp_order_channel");
+        orderChannel.onmessage = function() { refreshAccountSummary(); };
+    } catch (e) {}
+}
+
+refreshAccountSummary();
+setInterval(refreshAccountSummary, 1500);
+
+
+/* ==================================================
+   OPEN NOTIFICATIONS
+================================================== */
+
+
+function openNotifications(event) { return qfpOpenNotifications(event); }
+
+
+
+/* ==================================================
+   CLOSE NOTIFICATIONS
+================================================== */
+
+function closeNotifications() { return qfpCloseNotifications(); }
+
+
+
+/* ==================================================
+   CLOSE WHEN CLICKING OUTSIDE
+================================================== */
+
+document.getElementById("warningOverlay").addEventListener("click", function(event) {
+    if (event.target === this) closeWarning();
+});
+
+
+document
+    .getElementById("notificationOverlay")
+    .addEventListener(
+        "click",
+        function(event) {
+
+            if (
+                event.target ===
+                this
+            ) {
+
+                closeNotifications();
+
+            }
+
+        }
+    );
+
+
+
+/* ==================================================
+   ESC KEY
+================================================== */
+
+document.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (
+            event.key === "Escape"
+        ) {
+
+            closeNotifications();
+
+        }
+
+    }
+);
+
+
+
+/* ==================================================
+   LOGOUT
+================================================== */
+
+function openLogoutPopup(event) {
+
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.stopImmediatePropagation) {
+            event.stopImmediatePropagation();
+        }
+    }
+
+    const notification = document.getElementById("notificationOverlay");
+    const popup = document.getElementById("logoutPopup");
+
+    // Logout must always take priority over the notification modal.
+    if (notification) {
+        notification.style.setProperty("display", "none", "important");
+    }
+    document.body.classList.remove("notification-modal-open");
+
+    if (!popup) return false;
+
+    popup.style.setProperty("display", "flex", "important");
+    popup.setAttribute("aria-hidden", "false");
+    document.body.classList.add("logout-modal-open");
+    document.body.style.setProperty("overflow", "hidden", "important");
+
+    // Put keyboard focus directly on Cancel so the dialog is immediately active.
+    const cancelButton = popup.querySelector(".cancel-logout-btn");
+    if (cancelButton) {
+        setTimeout(function () { cancelButton.focus(); }, 0);
+    }
+
+    return false;
+}
+
+// Backward-compatible name for any existing code that calls confirmLogout().
+function confirmLogout(event) {
+    return openLogoutPopup(event);
+}
+
+
+function closeLogoutPopup() {
+
+    const popup = document.getElementById("logoutPopup");
+    if (popup) {
+        popup.style.setProperty("display", "none", "important");
+        popup.setAttribute("aria-hidden", "true");
+    }
+    document.body.classList.remove("logout-modal-open");
+
+    if (!document.body.classList.contains("notification-modal-open")) {
+        document.body.style.removeProperty("overflow");
+    }
+
+}
+
+
+function logoutUser() {
+
+    window.location.href = "/logout";
+
+}
+
+
+document.getElementById("logoutPopup").addEventListener(
+    "click",
+    function(event) {
+
+        if (event.target === this) {
+
+            closeLogoutPopup();
+
+        }
+
+    }
+);
+
+</script>
+
+
+
+<!-- Secure QR Delivery Scanner -->
+<div id="qrScanModal" class="qfp-qr-modal" aria-hidden="true">
+  <div class="qfp-qr-card">
+    <button class="qfp-qr-close" type="button" onclick="closeQRScanner()" aria-label="Close">&times;</button>
+    <h2>Secure QR Delivery</h2>
+    <p>Scan the QR code printed on the front page of your QueueFree printout.</p>
+    <div id="qfpQrReader"></div>
+    <div id="qfpQrResult" class="qfp-qr-result"></div>
+    <div class="qfp-qr-manual">
+      <input id="qfpQrToken" type="text" placeholder="Paste QR token or verification link">
+      <button type="button" onclick="verifyQRManual()">Verify</button>
+    </div>
+    <small>You must be logged in as the student who placed the order. Wrong-student QR codes will not change the order status.</small>
+  </div>
+</div>
+<style>
+.qfp-qr-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:99999;align-items:center;justify-content:center;padding:20px}
+.qfp-qr-modal.show{display:flex}.qfp-qr-card{position:relative;width:min(560px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;padding:26px;box-shadow:0 25px 70px rgba(0,0,0,.2)}
+.qfp-qr-close{position:absolute;right:14px;top:10px;border:0;background:transparent;font-size:30px;cursor:pointer;color:#555}.qfp-qr-card h2{margin:0 35px 6px 0}.qfp-qr-card p{margin:0 0 18px;color:#667085}.qfp-qr-card #qfpQrReader{width:100%;max-width:460px;margin:auto}.qfp-qr-result{margin-top:15px;padding:12px;border-radius:10px;display:none}.qfp-qr-result.show{display:block}.qfp-qr-result.ok{background:#effaf2;border:1px solid #b9dfc2}.qfp-qr-result.bad{background:#fff4f4;border:1px solid #efc1c1}.qfp-qr-manual{display:flex;gap:8px;margin-top:15px}.qfp-qr-manual input{flex:1;padding:11px;border:1px solid #ccd3de;border-radius:9px}.qfp-qr-manual button{padding:11px 15px;border:0;border-radius:9px;cursor:pointer}.qfp-qr-card small{display:block;margin-top:12px;color:#777;line-height:1.45}
+</style>
+<script>
+let qfpQrScanner=null;
+let qfpQrBusy=false;
+function openQRScanner(e){
+  if(e)e.preventDefault();
+  const modal=document.getElementById('qrScanModal');
+  modal.classList.add('show'); modal.setAttribute('aria-hidden','false');
+  document.getElementById('qfpQrResult').className='qfp-qr-result';
+  document.getElementById('qfpQrResult').innerHTML='';
+  setTimeout(startQRScanner,100);
+}
+async function startQRScanner(){
+  if(!window.Html5Qrcode || qfpQrScanner) return;
+  qfpQrScanner=new Html5Qrcode('qfpQrReader');
+  try{
+    await qfpQrScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250}},onQRScanned,()=>{});
+  }catch(err){
+    showQRResult(false,'Camera unavailable. Allow camera access or use the manual verification field below.');
+  }
+}
+async function stopQRScanner(){
+  if(qfpQrScanner){try{await qfpQrScanner.stop();}catch(e){} try{qfpQrScanner.clear();}catch(e){} qfpQrScanner=null;}
+}
+function closeQRScanner(){
+  const modal=document.getElementById('qrScanModal');
+  modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); stopQRScanner();
+}
+function extractQRToken(value){
+  value=(value||'').trim();
+  try{
+    const u=new URL(value,window.location.origin);
+    const m=u.pathname.match(/\/verify-delivery\/([^/]+)/);
+    if(m)return m[1];
+    if(u.searchParams.get('token'))return u.searchParams.get('token');
+  }catch(e){}
+  return value;
+}
+function onQRScanned(decodedText){
+  if(qfpQrBusy)return; qfpQrBusy=true;
+  verifyQRToken(extractQRToken(decodedText));
+}
+function verifyQRManual(){verifyQRToken(extractQRToken(document.getElementById('qfpQrToken').value));}
+function verifyQRToken(token){
+  if(!token){qfpQrBusy=false;showQRResult(false,'Invalid QR Code.');return;}
+  stopQRScanner();
+  // Backend performs the security check: QR token -> order -> user -> match.
+  window.location.href="{{ url_for('verify_delivery', token='TOKEN_PLACEHOLDER') }}".replace('TOKEN_PLACEHOLDER',encodeURIComponent(token));
+}
+function showQRResult(ok,msg){
+  const box=document.getElementById('qfpQrResult'); box.className='qfp-qr-result show '+(ok?'ok':'bad');
+  box.textContent=msg;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeQRScanner()});
+</script>
+
+</body>
+
+</html>

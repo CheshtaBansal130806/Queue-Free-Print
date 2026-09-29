@@ -1,0 +1,1611 @@
+/* ==================================================
+   RESET
+================================================== */
+
+* {
+
+    margin: 0;
+
+    padding: 0;
+
+    box-sizing: border-box;
+
+}
+
+
+html {
+
+    scroll-behavior: smooth;
+
+}
+
+
+body {
+
+    font-family: Arial, Helvetica, sans-serif;
+
+    background-color: #f0f2f4;
+
+    color: #222;
+
+    line-height: 1.6;
+
+}
+
+
+
+/* ==================================================
+   NAVBAR
+================================================== */
+
+nav {
+
+    width: 100%;
+
+    min-height: 75px;
+
+    background-color: #ffffff;
+
+    border-bottom: 1px solid #dddddd;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+
+    padding: 0 60px;
+
+    position: sticky;
+
+    top: 0;
+
+    z-index: 1000;
+
+}
+
+
+.logo {
+
+    font-size: 24px;
+
+    font-weight: 700;
+
+    color: #222;
+
+    letter-spacing: 0.5px;
+
+}
+
+
+.logo span {
+
+    color: #777;
+
+}
+
+
+.nav-links {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 30px;
+
+}
+
+
+.nav-links a {
+
+    text-decoration: none;
+
+    color: #333;
+
+    font-size: 15px;
+
+    font-weight: 500;
+
+    transition: 0.3s;
+
+}
+
+
+.nav-links a:hover {
+
+    color: #777;
+
+}
+
+
+
+/* ==================================================
+   DASHBOARD
+================================================== */
+
+.dashboard {
+
+    width: 100%;
+
+    max-width: 1200px;
+
+    margin: auto;
+
+    padding: 50px 30px;
+
+}
+
+
+
+/* ==================================================
+   WELCOME SECTION
+================================================== */
+
+.welcome {
+
+    background-color: #ffffff;
+
+    border: 1px solid #dddddd;
+
+    border-radius: 12px;
+
+    padding: 35px;
+
+    margin-bottom: 35px;
+
+}
+
+
+.welcome h1 {
+
+    font-size: 30px;
+
+    color: #222;
+
+    margin-bottom: 8px;
+
+}
+
+
+.welcome p {
+
+    color: #777;
+
+    font-size: 15px;
+
+}
+
+
+
+/* ==================================================
+   DASHBOARD SECTION
+================================================== */
+
+.dashboard-section {
+
+    margin-bottom: 45px;
+
+}
+
+
+.dashboard-section h2 {
+
+    font-size: 23px;
+
+    color: #222;
+
+    margin-bottom: 22px;
+
+}
+
+
+
+/* ==================================================
+   ORDER STATISTICS
+================================================== */
+
+.order-stats {
+
+    display: grid;
+
+    grid-template-columns: repeat(4, 1fr);
+
+    gap: 20px;
+
+}
+
+
+.stat-card {
+
+    background-color: #ffffff;
+
+    border: 1px solid #dddddd;
+
+    border-radius: 12px;
+
+    padding: 25px;
+
+    text-align: center;
+
+    transition: 0.3s;
+
+}
+
+
+.stat-card:hover {
+
+    transform: translateY(-3px);
+
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+
+}
+
+
+.stat-icon {
+
+    display: block;
+
+    font-size: 30px;
+
+    margin-bottom: 12px;
+
+}
+
+
+.stat-card h3 {
+
+    font-size: 15px;
+
+    color: #555;
+
+    margin-bottom: 8px;
+
+}
+
+
+.stat-card strong {
+
+    display: block;
+
+    font-size: 28px;
+
+    color: #222;
+
+    margin-bottom: 5px;
+
+}
+
+
+.stat-card p {
+
+    font-size: 13px;
+
+    color: #888;
+
+}
+
+
+
+/* ==================================================
+   ORDERS TABLE
+================================================== */
+
+.orders-table-container {
+
+    width: 100%;
+
+    background-color: #ffffff;
+
+    border: 1px solid #dddddd;
+
+    border-radius: 12px;
+
+    overflow-x: auto;
+
+}
+
+
+table {
+
+    width: 100%;
+
+    border-collapse: collapse;
+
+    min-width: 700px;
+
+}
+
+
+thead {
+
+    background-color: #f5f5f5;
+
+}
+
+
+th {
+
+    padding: 16px 20px;
+
+    text-align: left;
+
+    font-size: 14px;
+
+    color: #333;
+
+    font-weight: 600;
+
+    border-bottom: 1px solid #dddddd;
+
+}
+
+
+td {
+
+    padding: 16px 20px;
+
+    font-size: 14px;
+
+    color: #555;
+
+    border-bottom: 1px solid #eeeeee;
+
+}
+
+
+tbody tr:last-child td {
+
+    border-bottom: none;
+
+}
+
+
+tbody tr:hover {
+
+    background-color: #fafafa;
+
+}
+
+
+
+/* ==================================================
+   ACTION BUTTONS
+================================================== */
+
+.action-buttons {
+
+    display: flex;
+
+    gap: 8px;
+
+}
+
+
+.accept-btn,
+.decline-btn {
+
+    padding: 8px 14px;
+
+    border-radius: 6px;
+
+    font-size: 13px;
+
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: 0.3s;
+
+}
+
+
+
+/* ================= ACCEPT BUTTON ================= */
+
+.accept-btn {
+
+    background-color: #16a34a;
+
+    color: #ffffff;
+
+    border: 1px solid #16a34a;
+
+}
+
+
+.accept-btn:hover {
+
+    background-color: #15803d;
+
+    border-color: #15803d;
+
+}
+
+
+
+/* ================= DECLINE BUTTON ================= */
+
+.decline-btn {
+
+    background-color: #dc2626;
+
+    color: #ffffff;
+
+    border: 1px solid #dc2626;
+
+}
+
+
+.decline-btn:hover {
+
+    background-color: #b91c1c;
+
+    border-color: #b91c1c;
+
+}
+
+
+
+/* ==================================================
+   FOOTER
+================================================== */
+
+footer {
+
+    background-color: #222;
+
+    color: #ffffff;
+
+    margin-top: 40px;
+
+}
+
+
+.footer-content {
+
+    max-width: 1200px;
+
+    margin: auto;
+
+    padding: 45px 30px;
+
+    display: grid;
+
+    grid-template-columns: 2fr 1fr;
+
+    gap: 60px;
+
+}
+
+
+.footer-content h3 {
+
+    font-size: 18px;
+
+    margin-bottom: 15px;
+
+}
+
+
+.footer-content p {
+
+    color: #bbbbbb;
+
+    font-size: 14px;
+
+    max-width: 500px;
+
+    line-height: 1.7;
+
+}
+
+
+.footer-content a {
+
+    display: block;
+
+    color: #bbbbbb;
+
+    text-decoration: none;
+
+    font-size: 14px;
+
+    margin-bottom: 8px;
+
+    transition: 0.3s;
+
+}
+
+
+.footer-content a:hover {
+
+    color: #ffffff;
+
+}
+
+
+.footer-bottom {
+
+    border-top: 1px solid #444444;
+
+    text-align: center;
+
+    padding: 18px 20px;
+
+    color: #aaaaaa;
+
+    font-size: 13px;
+
+}
+
+
+
+/* ==================================================
+   LOGOUT CONFIRMATION POPUP
+================================================== */
+
+.logout-overlay {
+
+    position: fixed;
+
+    top: 0;
+
+    left: 0;
+
+    width: 100%;
+
+    height: 100%;
+
+    background: rgba(0, 0, 0, 0.55);
+
+    display: none;
+
+    align-items: center;
+
+    justify-content: center;
+
+    z-index: 9999;
+
+    padding: 20px;
+
+}
+
+
+.logout-box {
+
+    width: 100%;
+
+    max-width: 400px;
+
+    background: #ffffff;
+
+    border-radius: 14px;
+
+    padding: 30px;
+
+    text-align: center;
+
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+
+    animation: logoutPopup 0.2s ease;
+
+}
+
+
+.logout-icon {
+
+    width: 55px;
+
+    height: 55px;
+
+    margin: 0 auto 18px;
+
+    border-radius: 50%;
+
+    background: #f0f0f0;
+
+    color: #222;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    font-size: 28px;
+
+    font-weight: bold;
+
+}
+
+
+.logout-box h2 {
+
+    margin-bottom: 10px;
+
+    color: #222;
+
+    font-size: 22px;
+
+}
+
+
+.logout-box p {
+
+    margin-bottom: 25px;
+
+    color: #666;
+
+    font-size: 15px;
+
+}
+
+
+.logout-buttons {
+
+    display: flex;
+
+    justify-content: center;
+
+    gap: 12px;
+
+}
+
+
+.logout-buttons button {
+
+    padding: 11px 22px;
+
+    border-radius: 7px;
+
+    font-size: 14px;
+
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+
+}
+
+
+.cancel-logout-btn {
+
+    background: #ffffff;
+
+    color: #333;
+
+    border: 1px solid #ccc;
+
+}
+
+
+.cancel-logout-btn:hover {
+
+    background: #f2f2f2;
+
+}
+
+
+.confirm-logout-btn {
+
+    background: #dc2626;
+
+    color: #ffffff;
+
+    border: 1px solid #dc2626;
+
+}
+
+
+.confirm-logout-btn:hover {
+
+    background: #b91c1c;
+
+    border-color: #b91c1c;
+
+}
+
+
+/* ==================================================
+   LOGOUT POPUP ANIMATION
+================================================== */
+
+@keyframes logoutPopup {
+
+    from {
+
+        opacity: 0;
+
+        transform: scale(0.95);
+
+    }
+
+    to {
+
+        opacity: 1;
+
+        transform: scale(1);
+
+    }
+
+}
+
+
+
+/* ==================================================
+   RESPONSIVE DESIGN
+================================================== */
+
+@media (max-width: 900px) {
+
+    nav {
+
+        padding: 0 30px;
+
+    }
+
+
+    .nav-links {
+
+        gap: 18px;
+
+    }
+
+
+    .order-stats {
+
+        grid-template-columns: repeat(2, 1fr);
+
+    }
+
+
+    .footer-content {
+
+        grid-template-columns: 1fr 1fr;
+
+    }
+
+}
+
+
+@media (max-width: 600px) {
+
+    nav {
+
+        min-height: auto;
+
+        padding: 20px;
+
+        flex-direction: column;
+
+        gap: 15px;
+
+    }
+
+
+    .nav-links {
+
+        width: 100%;
+
+        justify-content: center;
+
+        flex-wrap: wrap;
+
+        gap: 15px;
+
+    }
+
+
+    .dashboard {
+
+        padding: 30px 15px;
+
+    }
+
+
+    .welcome {
+
+        padding: 25px 20px;
+
+    }
+
+
+    .welcome h1 {
+
+        font-size: 25px;
+
+    }
+
+
+    .order-stats {
+
+        grid-template-columns: 1fr;
+
+    }
+
+
+    .dashboard-section h2 {
+
+        font-size: 20px;
+
+    }
+
+
+    .action-buttons {
+
+        flex-direction: column;
+
+    }
+
+
+    .accept-btn,
+    .decline-btn {
+
+        width: 100%;
+
+    }
+
+
+    .footer-content {
+
+        grid-template-columns: 1fr;
+
+        gap: 30px;
+
+        padding: 35px 20px;
+
+    }
+
+
+    .logout-box {
+
+        padding: 28px 20px;
+
+        border-radius: 10px;
+
+    }
+
+
+    .logout-box h2 {
+
+        font-size: 20px;
+
+    }
+
+
+    .logout-box p {
+
+        font-size: 13px;
+
+    }
+
+
+    .logout-buttons {
+
+        flex-direction: column;
+
+    }
+
+
+    .cancel-logout-btn,
+    .confirm-logout-btn {
+
+        width: 100%;
+
+    }
+
+}
+
+
+@media (max-width: 400px) {
+
+    .logo {
+
+        font-size: 21px;
+
+    }
+
+
+    .nav-links {
+
+        gap: 10px;
+
+    }
+
+
+    .nav-links a {
+
+        font-size: 13px;
+
+    }
+
+
+    .welcome h1 {
+
+        font-size: 22px;
+
+    }
+
+
+    .stat-card {
+
+        padding: 20px;
+
+    }
+
+}
+
+/* ==================================================
+   ORDER ACCEPT / DECLINE CONFIRMATION POPUP
+================================================== */
+
+.order-confirm-overlay {
+
+    position: fixed;
+
+    inset: 0;
+
+    width: 100%;
+
+    height: 100%;
+
+    background: rgba(0, 0, 0, 0.55);
+
+    display: none;
+
+    align-items: center;
+
+    justify-content: center;
+
+    z-index: 10000;
+
+    padding: 20px;
+
+}
+
+
+.order-confirm-box {
+
+    width: 100%;
+
+    max-width: 430px;
+
+    background: #ffffff;
+
+    border: 1px solid #dddddd;
+
+    border-radius: 14px;
+
+    padding: 32px;
+
+    text-align: center;
+
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+
+    animation: orderConfirmPopup 0.2s ease;
+
+}
+
+
+.order-confirm-icon {
+
+    width: 58px;
+
+    height: 58px;
+
+    margin: 0 auto 18px;
+
+    border-radius: 50%;
+
+    background: #f1f1f1;
+
+    color: #222222;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    font-size: 28px;
+
+    font-weight: 700;
+
+}
+
+
+.order-confirm-box h2 {
+
+    margin: 0 0 10px;
+
+    color: #222222;
+
+    font-size: 22px;
+
+}
+
+
+.order-confirm-box p {
+
+    margin: 0 auto 25px;
+
+    max-width: 340px;
+
+    color: #666666;
+
+    font-size: 15px;
+
+    line-height: 1.6;
+
+}
+
+
+.order-confirm-buttons {
+
+    display: flex;
+
+    justify-content: center;
+
+    gap: 12px;
+
+}
+
+
+.order-confirm-buttons button {
+
+    min-width: 105px;
+
+    padding: 11px 20px;
+
+    border-radius: 7px;
+
+    font-size: 14px;
+
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+
+}
+
+
+.order-cancel-btn {
+
+    background: #ffffff;
+
+    color: #333333;
+
+    border: 1px solid #cccccc;
+
+}
+
+
+.order-cancel-btn:hover {
+
+    background: #f5f5f5;
+
+    border-color: #aaaaaa;
+
+}
+
+
+.order-confirm-btn {
+
+    background: #222222;
+
+    color: #ffffff;
+
+    border: 1px solid #222222;
+
+}
+
+
+.order-confirm-btn:hover {
+
+    background: #444444;
+
+    border-color: #444444;
+
+}
+
+
+@keyframes orderConfirmPopup {
+
+    from {
+
+        opacity: 0;
+
+        transform: translateY(-8px) scale(0.98);
+
+    }
+
+    to {
+
+        opacity: 1;
+
+        transform: translateY(0) scale(1);
+
+    }
+
+}
+
+
+@media (max-width: 600px) {
+
+    .order-confirm-box {
+
+        padding: 26px 22px;
+
+    }
+
+    .order-confirm-buttons {
+
+        flex-direction: column-reverse;
+
+    }
+
+    .order-confirm-buttons button {
+
+        width: 100%;
+
+    }
+
+}
+
+/* ================= PRINT DOCUMENT POPUP ================= */
+
+.print-document-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.72);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.print-document-box {
+    width: min(1280px, 96vw);
+    height: min(820px, 94vh);
+    background: #ffffff;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+    display: flex;
+    flex-direction: column;
+    animation: printDocumentPopup 0.22s ease;
+}
+
+.print-document-content {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    background: #f2f2f2;
+}
+
+.print-document-viewer {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+}
+
+.order-preferences-panel {
+    min-width: 0;
+    overflow-y: auto;
+    background: #ffffff;
+    border-left: 1px solid #e3e3e3;
+    padding: 18px;
+}
+
+.order-preferences-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.order-preferences-title h3 {
+    margin: 0;
+    color: #222222;
+    font-size: 17px;
+}
+
+.order-preferences-title span {
+    color: #777777;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.order-preference-card {
+    border: 1px solid #e2e2e2;
+    border-radius: 10px;
+    padding: 13px;
+    margin-bottom: 12px;
+    background: #fafafa;
+}
+
+.preference-document-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #222222;
+    margin-bottom: 10px;
+    word-break: break-word;
+}
+
+.preference-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 7px 0;
+    border-top: 1px solid #eeeeee;
+    font-size: 12px;
+}
+
+.preference-row span {
+    color: #777777;
+    flex-shrink: 0;
+}
+
+.preference-row strong {
+    color: #222222;
+    text-align: right;
+    word-break: break-word;
+}
+
+.preference-requirements {
+    flex-direction: column;
+    gap: 4px;
+}
+
+.preference-requirements strong {
+    text-align: left;
+    font-weight: 500;
+    line-height: 1.45;
+}
+
+.order-preferences-empty {
+    color: #777777;
+    font-size: 13px;
+    text-align: center;
+    padding: 30px 10px;
+}
+
+.print-document-header {
+    min-height: 74px;
+    padding: 15px 20px;
+    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    background: #ffffff;
+}
+
+.print-document-header h2 {
+    margin: 0 0 4px;
+    font-size: 19px;
+    color: #222222;
+}
+
+.print-document-header p {
+    margin: 0;
+    color: #777777;
+    font-size: 13px;
+}
+
+.print-document-close {
+    width: 40px;
+    height: 40px;
+    border: 1px solid #d7d7d7;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #333333;
+    font-size: 27px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: 0.2s ease;
+}
+
+.print-document-close:hover {
+    background: #f4f4f4;
+}
+
+#printDocumentFrame {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: #f2f2f2;
+    flex: 1;
+}
+
+/* ================= PRINT COMPLETE WARNING ================= */
+
+.print-complete-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 11000;
+    background: rgba(0, 0, 0, 0.62);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.print-complete-box {
+    width: min(430px, 92vw);
+    padding: 34px 30px 30px;
+    border-radius: 15px;
+    background: #ffffff;
+    text-align: center;
+    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.25);
+    animation: printCompletePopup 0.22s ease;
+}
+
+.print-complete-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 17px;
+    border-radius: 50%;
+    background: #f2f2f2;
+    color: #222222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.print-complete-box h2 {
+    margin: 0 0 10px;
+    color: #222222;
+    font-size: 22px;
+}
+
+.print-complete-box p {
+    margin: 0 auto 25px;
+    max-width: 350px;
+    color: #666666;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.print-complete-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.print-complete-buttons button {
+    min-width: 130px;
+    padding: 11px 18px;
+    border-radius: 7px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.print-complete-close-btn {
+    background: #ffffff;
+    color: #333333;
+    border: 1px solid #cccccc;
+}
+
+.print-complete-close-btn:hover {
+    background: #f5f5f5;
+}
+
+.print-complete-notify-btn {
+    background: #222222;
+    color: #ffffff;
+    border: 1px solid #222222;
+}
+
+.print-complete-notify-btn:hover {
+    background: #444444;
+    border-color: #444444;
+}
+
+.print-complete-notify-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+@keyframes printDocumentPopup {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes printCompletePopup {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+
+@media (max-width: 900px) {
+    .print-document-content {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) auto;
+    }
+
+    .order-preferences-panel {
+        border-left: 0;
+        border-top: 1px solid #e3e3e3;
+        max-height: 42%;
+    }
+}
+
+@media (max-width: 600px) {
+    .print-document-overlay {
+        padding: 10px;
+    }
+
+    .print-document-box {
+        width: 100%;
+        height: 96vh;
+        border-radius: 10px;
+    }
+
+    .print-document-header {
+        padding: 13px 14px;
+    }
+
+    .print-document-header h2 {
+        font-size: 16px;
+    }
+
+    .print-document-header p {
+        font-size: 12px;
+    }
+
+    .print-complete-box {
+        padding: 28px 20px 24px;
+    }
+
+    .print-complete-buttons {
+        flex-direction: column-reverse;
+    }
+
+    .print-complete-buttons button {
+        width: 100%;
+    }
+}
+
+/* Document selector inside the admin print popup */
+.preference-document-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.preference-document-top .preference-document-name {
+    margin-bottom: 0;
+    flex: 1;
+}
+
+.select-document-btn {
+    flex: 0 0 auto;
+    border: 1px solid #d7d7d7;
+    background: #ffffff;
+    color: #333333;
+    border-radius: 7px;
+    padding: 7px 11px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.18s ease;
+}
+
+.select-document-btn:hover {
+    border-color: #222222;
+    background: #f5f5f5;
+}
+
+.select-document-btn.active {
+    background: #111111;
+    border-color: #111111;
+    color: #ffffff;
+}
+
+.order-preference-card.selected-document {
+    border-color: #111111;
+    box-shadow: 0 0 0 1px rgba(17, 17, 17, 0.08);
+}
+
+.no-requirements {
+    color: #999999 !important;
+    font-weight: 500 !important;
+}
+
+
+/* Payment summary shown beside accepted order preferences */
+.admin-payment-summary { border:1px solid #e2e8f0; border-radius:12px; padding:13px; margin-bottom:14px; background:#f8fafc; }
+.admin-payment-summary-title { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; font-weight:800; margin-bottom:7px; }
+.admin-payment-summary-main { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.admin-payment-summary-main strong { color:#111827; }
+.admin-payment-summary-main span { font-size:12px; font-weight:700; color:#15803d; }
+.admin-payment-summary-amount { margin-top:6px; font-weight:800; color:#111827; }
+.mark-cash-btn { width:100%; margin-top:10px; border:0; border-radius:9px; padding:9px 10px; background:#111827; color:#fff; font-weight:700; cursor:pointer; }
+.mark-cash-btn:disabled { opacity:.6; cursor:not-allowed; }
+
+
+/* ================= LIVE ACTION TOAST ================= */
+.qfp-action-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 99999;
+    width: min(390px, calc(100vw - 32px));
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 15px 16px;
+    border: 1px solid rgba(34, 197, 94, .20);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, .97);
+    box-shadow: 0 14px 38px rgba(15, 23, 42, .18);
+    backdrop-filter: blur(12px);
+    transform: translateY(24px) scale(.97);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease, transform .25s ease;
+}
+.qfp-action-toast.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+.qfp-action-toast-icon {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #dcfce7;
+    color: #15803d;
+    font-size: 20px;
+    font-weight: 800;
+}
+.qfp-action-toast strong,
+.qfp-action-toast span { display: block; }
+.qfp-action-toast strong { font-size: 14px; margin-bottom: 3px; }
+.qfp-action-toast span { font-size: 12px; color: #64748b; line-height: 1.4; }
+.qfp-action-toast button {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 22px;
+    cursor: pointer;
+    line-height: 1;
+}
+.qfp-action-toast button:hover { color: #334155; }
+.qfp-live-order-row { animation: qfpNewOrderIn .42s ease both; }
+@keyframes qfpNewOrderIn {
+    from { opacity: 0; transform: translateY(-7px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 600px) {
+    .qfp-action-toast { right: 16px; bottom: 16px; }
+}

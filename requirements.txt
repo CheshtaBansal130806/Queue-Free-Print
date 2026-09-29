@@ -1,0 +1,14 @@
+Flask
+mysql-connector-python
+google-genai
+pypdf
+Pillow
+
+pywebpush>=2.0.0
+
+qrcode[pil]
+
+reportlab
+
+requests>=2.31.0
+python-dotenv>=1.0.1

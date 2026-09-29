@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Queue Free Print | College Printing System</title>
+
+    <link rel="stylesheet" href="../static/index.css">
+    <script src="{{ url_for('static', filename='notifications.js') }}" defer></script>
+    <link rel="stylesheet" href="../static/responsive.css">
+</head>
+
+<body>
+<!-- ================= PUSH NOTIFICATION PERMISSION ================= -->
+<div class="push-permission" id="pushPermission" hidden>
+    <div class="push-permission-card">
+        <div class="push-permission-icon">🔔</div>
+        <div>
+            <h3>Stay updated on your print order</h3>
+            <p>Allow browser notifications to get order updates even when the website is closed.</p>
+            <div class="push-permission-actions">
+                <button type="button" id="enablePushBtn">Enable Notifications</button>
+                <button type="button" id="skipPushBtn">Not Now</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ================= NAVBAR ================= -->
+
+<nav>
+
+    <div class="logo">
+        Queue Free <span>Print</span>
+    </div>
+
+    <div class="nav-links">
+
+        <a href="#home">Overview</a>
+        <a href="#how">How It Works</a>
+        <a href="#services">Services</a>
+        <a href="#features">Features</a>
+        <a href="#login">Login</a>
+        <a href="/register">Register</a>
+
+    </div>
+
+</nav>
+
+
+<!-- ================= HOME ================= -->
+
+<section class="home" id="home">
+
+    <div class="home-content">
+
+        <h1>
+            Print Smart.<br>
+            <span>Skip the Queue.</span>
+        </h1>
+
+        <p>
+            Queue Free Print is an online printing system for college
+            students. Upload your document, select your printing
+            requirements, place your order and collect it when it is ready.
+        </p>
+
+        <div class="home-buttons">
+
+            <a href="#login" class="primary-btn">
+                Start Printing
+            </a>
+
+            <a href="#how" class="secondary-btn">
+                Learn More
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <div class="home-card">
+
+        <div>
+
+            <h2>🖨️ Easy Printing</h2>
+
+            <p>
+                No long queues. No confusion. Just upload,
+                select, order and collect.
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= HOW IT WORKS ================= -->
+
+<section class="how" id="how">
+
+    <div class="section-title">
+
+        <h2>How It Works</h2>
+
+        <p>
+            Complete your printing order in a few simple steps.
+        </p>
+
+    </div>
+
+
+    <div class="steps">
+
+
+        <div class="step">
+
+            <div class="number">1</div>
+
+            <h3>Login</h3>
+
+            <p>
+                Login using your student account.
+            </p>
+
+        </div>
+
+
+        <div class="step">
+
+            <div class="number">2</div>
+
+            <h3>Upload</h3>
+
+            <p>
+                Upload the document you want to print.
+            </p>
+
+        </div>
+
+
+        <div class="step">
+
+            <div class="number">3</div>
+
+            <h3>Select</h3>
+
+            <p>
+                Select copies, color, pages and side.
+            </p>
+
+        </div>
+
+
+        <div class="step">
+
+            <div class="number">4</div>
+
+            <h3>Order</h3>
+
+            <p>
+                Check the cost and place your order.
+            </p>
+
+        </div>
+
+
+        <div class="step">
+
+            <div class="number">5</div>
+
+            <h3>Collect</h3>
+
+            <p>
+                Get notified and collect your document.
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= SERVICES ================= -->
+
+<section id="services">
+
+    <div class="section-title">
+
+        <h2>Printing Services</h2>
+
+        <p>
+            Select the printing option according to your requirement.
+        </p>
+
+    </div>
+
+
+    <div class="services">
+
+
+        <div class="service-card">
+
+            <div class="service-icon">📄</div>
+
+            <h3>Black & White</h3>
+
+            <p>
+                Low-cost black and white printing for regular documents.
+            </p>
+
+        </div>
+
+
+        <div class="service-card">
+
+            <div class="service-icon">🎨</div>
+
+            <h3>Color Printing</h3>
+
+            <p>
+                Color printing for projects, presentations and reports.
+            </p>
+
+        </div>
+
+
+        <div class="service-card">
+
+            <div class="service-icon">📃</div>
+
+            <h3>Single-Sided</h3>
+
+            <p>
+                Print content on only one side of the paper.
+            </p>
+
+        </div>
+
+
+        <div class="service-card">
+
+            <div class="service-icon">📑</div>
+
+            <h3>Double-Sided</h3>
+
+            <p>
+                Print on both sides to save paper and cost.
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= FEATURES ================= -->
+
+<section id="features">
+
+    <div class="section-title">
+
+        <h2>Key Features</h2>
+
+        <p>
+            Features that make the printing process simple.
+        </p>
+
+    </div>
+
+
+    <div class="features">
+
+
+        <div class="feature-card">
+
+            <h3>📤 Easy Upload</h3>
+
+            <p>
+                Upload your PDF or supported document directly
+                through the website.
+            </p>
+
+        </div>
+
+
+        <div class="feature-card">
+
+            <h3>🧾 Print Options</h3>
+
+            <p>
+                Select copies, color, side, paper type and required pages
+                before placing the order.
+            </p>
+
+        </div>
+
+
+        <div class="feature-card">
+
+            <h3>💰 Cost Estimation</h3>
+
+            <p>
+                See the estimated printing cost before confirming
+                your order.
+            </p>
+
+        </div>
+
+
+        <div class="feature-card">
+
+            <h3>📦 Order Tracking</h3>
+
+            <p>
+                Track your order from pending to printing and ready.
+            </p>
+
+        </div>
+
+
+        <div class="feature-card">
+
+            <h3>🔔 Notifications</h3>
+
+            <p>
+                Receive a notification when your document is ready
+                for collection.
+            </p>
+
+        </div>
+
+
+        <div class="feature-card">
+
+            <h3>🔐 Secure Account</h3>
+
+            <p>
+                Student and admin accounts have separate access
+                and permissions.
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= LOGIN ================= -->
+
+<section class="login-section" id="login">
+
+    <div class="login-box">
+
+        <h2>Login</h2>
+
+        <p>
+            Choose your account type to continue.
+        </p>
+
+        {% if error %}
+        <p class="form-error">{{ error }}</p>
+        {% endif %}
+
+
+        <!-- ROLE SELECTION -->
+
+        <div class="role-selection">
+
+            <label class="role">
+
+                <input
+                    type="radio"
+                    name="role"
+                    value="user"
+                    checked
+                >
+
+                🎓 User
+
+            </label>
+
+
+            <label class="role">
+
+                <input
+                    type="radio"
+                    name="role"
+                    value="admin"
+                >
+
+                👨‍💼 Admin
+
+            </label>
+
+        </div>
+
+
+        <!-- LOGIN FORM -->
+
+        <form action="/login" method="POST">
+
+            <input type="hidden" name="role" id="login-role" value="user">
+
+            <label for="login-email">
+                Email
+            </label>
+
+            <input
+                type="email"
+                id="login-email"
+                name="email"
+                placeholder="Enter your email"
+                autocomplete="off"
+                required
+            >
+
+
+            <label for="login-password">
+                Password
+            </label>
+
+            <input
+                type="password"
+                id="login-password"
+                name="password"
+                placeholder="Enter your password"
+                autocomplete="new-password"
+                required
+            >
+
+
+            <a href="#" class="forgot">
+                Forgot Password?
+            </a>
+
+
+            <button
+                type="submit"
+                class="login-submit"
+            >
+                Login
+            </button>
+
+        </form>
+
+
+        <!-- REGISTER LINK -->
+
+        <p class="register-link">
+
+            Don't have an account?
+
+            <a href="/register">
+                Register here
+            </a>
+
+        </p>
+
+    </div>
+
+</section>
+
+
+<!-- ================= REGISTER ================= -->
+
+<section class="register-section" id="register">
+
+    <div class="register-box">
+
+        <h2>
+            Create Your Account
+        </h2>
+
+        <p>
+            New students can register and start placing their
+            printing orders online.
+        </p>
+
+
+        <a
+            href="register.html"
+            class="primary-btn"
+        >
+            Register Now
+        </a>
+
+    </div>
+
+</section>
+
+
+<!-- ================= FOOTER ================= -->
+
+<footer>
+
+    <div class="footer-content">
+
+
+        <!-- ABOUT -->
+
+        <div class="footer-column">
+
+            <h3>
+                QueueFree Print
+            </h3>
+
+            <p>
+                A simple online printing and photocopy system
+                designed to save students' time and reduce
+                long queues at college print shops.
+            </p>
+
+        </div>
+
+
+        <!-- EMPTY COLUMN -->
+
+        <div class="footer-column">
+        </div>
+
+
+        <!-- QUICK LINKS -->
+
+        <div class="footer-column">
+
+            <h3>
+                Quick Links
+            </h3>
+
+            <a href="#home">
+                Overview
+            </a>
+
+            <a href="#how">
+                How It Works
+            </a>
+
+            <a href="#services">
+                Services
+            </a>
+
+            <a href="#features">
+                Features
+            </a>
+
+        </div>
+
+
+        <!-- ACCOUNT -->
+
+        <div class="footer-column">
+
+            <h3>
+                Account
+            </h3>
+
+            <a href="#login">
+                User Login
+            </a>
+
+            <a href="#login">
+                Admin Login
+            </a>
+
+            <a href="/register">
+                Register
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <!-- FOOTER BOTTOM -->
+
+    <div class="footer-bottom">
+
+        © 2026 QueueFree Print |
+        Queue-Free Print & Photocopy System
+
+    </div>
+
+</footer>
+
+
+<script>
+    // Keep the selected account type inside the login form.
+    // The role radio buttons are outside the form for styling/layout,
+    // so this hidden field is what Flask receives.
+    const loginRole = document.getElementById("login-role");
+    const roleOptions = document.querySelectorAll('.role-selection input[name="role"]');
+
+    function syncLoginRole() {
+        const selected = document.querySelector('.role-selection input[name="role"]:checked');
+        loginRole.value = selected ? selected.value : "user";
+    }
+
+    roleOptions.forEach(option => option.addEventListener("change", syncLoginRole));
+    syncLoginRole();
+</script>
+
+<script>
+(function(){
+    const box=document.getElementById("pushPermission");
+    const enable=document.getElementById("enablePushBtn");
+    const skip=document.getElementById("skipPushBtn");
+    if(!box || !("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if(Notification.permission === "default" && localStorage.getItem("qfp_push_dismissed") !== "1") box.hidden=false;
+    if(Notification.permission === "granted") window.qfpSyncPushSubscription && window.qfpSyncPushSubscription();
+    enable && enable.addEventListener("click", async function(){
+        const permission=await Notification.requestPermission();
+        box.hidden=true;
+        if(permission === "granted" && window.qfpSyncPushSubscription) await window.qfpSyncPushSubscription();
+    });
+    skip && skip.addEventListener("click", function(){ localStorage.setItem("qfp_push_dismissed","1"); box.hidden=true; });
+})();
+</script>
+</body>
+
+</html>>

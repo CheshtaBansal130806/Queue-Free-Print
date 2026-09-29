@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Settings | Queue-Free Print</title>
+
+    <link rel="stylesheet" href="../static/settings.css">
+
+
+<script>
+/* Prevent browser back/BFCache from reopening a protected page after logout. */
+window.addEventListener("pageshow", async function (event) {
+    if (!event.persisted) return;
+
+    try {
+        const response = await fetch("{{ url_for('session_status') }}", {
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const data = await response.json();
+
+        if (!data.logged_in) {
+            window.location.replace("{{ url_for('home') }}");
+        }
+    } catch (e) {
+        window.location.replace("{{ url_for('home') }}");
+    }
+});
+</script>
+
+
+<script>
+/* Re-check authentication whenever this protected page is shown, including browser Back/BFCache. */
+(function () {
+    const homeUrl = "{{ url_for('home') }}";
+    const statusUrl = "{{ url_for('session_status') }}";
+
+    async function verifySession() {
+        try {
+            const response = await fetch(statusUrl, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache" }
+            });
+            const data = await response.json();
+
+            if (!data.logged_in) {
+                window.location.replace(homeUrl);
+            }
+        } catch (error) {
+            window.location.replace(homeUrl);
+        }
+    }
+
+    window.addEventListener("pageshow", verifySession);
+})();
+</script>
+<script src="{{ url_for('static', filename='notifications.js') }}" defer></script>
+
+    <link rel="stylesheet" href="../static/responsive.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='nearby_shops.css') }}">
+    <script src="{{ url_for('static', filename='nearby_shops.js') }}" defer></script>
+</head>
+
+
+<body data-user-role="admin">
+
+
+<!-- =====================================================
+     NAVBAR
+===================================================== -->
+
+<nav>
+    <div class="logo">Queue-Free <span>Print</span></div>
+    <div class="nav-links">
+        <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('admin_dashboard') }}#orders">Orders</a>
+        <a href="{{ url_for('analytics') }}">Analytics</a>
+        <a href="{{ url_for('settings') }}" class="active">Settings</a>
+        <a class="notification-link" href="#" onclick="qfpOpenNotifications(event)">Notifications <span class="notification-badge" id="notificationBadge" hidden>0</span></a>
+        <a href="#" onclick="confirmLogout(event)">Logout</a>
+    </div>
+</nav>
+
+
+<!-- =====================================================
+     SETTINGS PAGE
+===================================================== -->
+
+<main class="settings-page">
+
+
+    <!-- PAGE HEADER -->
+
+    <div class="settings-header">
+
+        <h1>
+            Settings
+        </h1>
+
+        <p>
+            Manage your shop, prices, account and printing preferences.
+        </p>
+
+    </div>
+
+
+    <!-- =================================================
+         SHOP STATUS
+    ================================================== -->
+
+    <section class="settings-card shop-status-section">
+
+        <div class="settings-title">
+
+            <div>
+
+                <h2>
+                    🏪 Shop Status
+                </h2>
+
+                <p>
+                    Control whether students can place new orders.
+                </p>
+
+            </div>
+
+            <div class="shop-status">
+
+                <span class="status-dot"></span>
+
+                <strong id="shop-status-text">
+                    Shop Open
+                </strong>
+
+            </div>
+
+        </div>
+
+
+        <div class="status-control">
+
+            <label class="switch">
+
+                <input
+                    type="checkbox"
+                    id="shop-toggle"
+                    {% if shop_is_open %}checked{% endif %}
+                    onchange="changeShopStatus()"
+                >
+
+                <span class="slider"></span>
+
+            </label>
+
+            <div>
+
+                <strong>
+                    Accept New Orders
+                </strong>
+
+                <p id="shop-message">
+                    {% if shop_is_open %}Students can currently place printing orders.{% else %}New printing orders are currently disabled.{% endif %}
+                </p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <section class="settings-card">
+        <div class="settings-title">
+            <div><h2>📍 Shop Location</h2><p>Pick your exact shop location on the map. Latitude and longitude are saved automatically.</p></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+            <div><strong id="qfpSavedLocationStatus">{% if profile.latitude and profile.longitude %}Location saved{% else %}Location not set{% endif %}</strong><p id="qfpSavedLocationDetail" style="margin:5px 0;color:#6b7280;">{% if profile.latitude and profile.longitude %}Latest saved shop location: {{ "%.6f"|format(profile.latitude|float) }}, {{ "%.6f"|format(profile.longitude|float) }}. You can change it anytime using Pick on Map.{% else %}Set your location once so students can find your shop within 1 km.{% endif %}</p></div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                <button type="button" class="qfp-nearby-btn qfp-admin-location-btn" id="qfpAdminLocationBtn" onclick="qfpOpenAdminShopPicker()">🗺️ Pick on Map</button>
+            </div>
+        </div>
+    </section>
+
+
+
+    <!-- =================================================
+         PROFILE SETTINGS
+    ================================================== -->
+
+    <section class="settings-card">
+
+        <div class="settings-title">
+
+            <div>
+
+                <h2>
+                    👤 Profile Settings
+                </h2>
+
+                <p>
+                    Update your shop administrator information.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="form-grid">
+
+            <div class="input-group">
+                <label for="profile-name">
+                    Full Name
+                </label>
+
+                <input
+                    type="text"
+                    id="profile-name"
+                    value="{{ profile.name or '' }}"
+                    placeholder="Enter your name"
+                    required
+                >
+            </div>
+
+            <div class="input-group">
+                <label for="profile-email">
+                    Email
+                </label>
+
+                <input
+                    type="email"
+                    id="profile-email"
+                    value="{{ profile.email or '' }}"
+                    placeholder="Enter your email"
+                    required
+                >
+            </div>
+
+            <div class="input-group">
+                <label for="profile-university">University / College Name</label>
+                <input type="text" id="profile-university" value="{{ profile.university_name or '' }}" placeholder="Enter university / college name" required>
+            </div>
+
+            <div class="input-group">
+                <label for="profile-state">State</label>
+                {% set states = ["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal","Delhi","Jammu and Kashmir","Ladakh","Puducherry","Chandigarh"] %}
+                <select id="profile-state" required><option value="">Select State</option>{% for st in states %}<option value="{{ st }}" {% if profile.state == st %}selected{% endif %}>{{ st }}</option>{% endfor %}</select>
+            </div>
+
+            <div class="input-group">
+                <label for="profile-shop-name">Shop Name</label>
+                <input type="text" id="profile-shop-name" value="{{ profile.shop_name or '' }}" placeholder="Enter shop name" required>
+            </div>
+
+            <div class="input-group">
+                <label for="profile-gst">GST Number</label>
+                <input type="text"
+                       id="profile-gst"
+                       value="{{ profile.gst_number or '' }}"
+                       readonly
+                       aria-readonly="true"
+                       placeholder="GST Number">
+            </div>
+
+            <div class="input-group" style="grid-column:1/-1;">
+                <label for="profile-address">Address</label>
+                <textarea id="profile-address" placeholder="Enter shop address" rows="3">{{ profile.address or '' }}</textarea>
+            </div>
+
+            <div class="input-group">
+                <label for="profile-phone">
+                    Phone Number
+                </label>
+
+                <input
+                    type="tel"
+                    id="profile-phone"
+                    value="{{ profile.phone or '' }}"
+                    placeholder="Enter phone number"
+                >
+            </div>
+
+
+
+        </div>
+
+        <div class="profile-save-row">
+            <span id="profile-message" class="profile-message"></span>
+            <button
+                type="button"
+                class="save-btn profile-save-btn"
+                id="profile-save-btn"
+                onclick="saveProfileChanges()"
+            >
+                Save Changes
+            </button>
+        </div>
+
+    </section>
+
+
+
+    <!-- =================================================
+         PRINTING PRICES
+    ================================================== -->
+
+    <section class="settings-card pricing-section">
+
+        <div class="settings-title">
+            <div>
+                <h2>Printing Prices</h2>
+                <p>Set page-wise prices for different printing services.</p>
+            </div>
+        </div>
+
+        <!-- =================================================
+             A4 PRICING
+        ================================================== -->
+        <div class="pricing-service">
+            <div class="service-heading">
+                <div class="service-info">
+                    <div>
+                        <h3>A4 Printing</h3>
+                        <p>Regular A4 document printing</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rate-table">
+                <div class="rate-header">
+                    <span>Page Range</span>
+                    <span>Rate</span>
+                </div>
+
+                <div class="rate-row">
+                    <span>1 Page</span>
+                    <div class="rate-input">
+                        <span>₹</span>
+                        <input type="number" min="0" step="0.01" id="a4-price-1" value="{{ pricing.get('A4 Printing', {}).get('1-1', '') }}">
+                        <small>/ page</small>
+                    </div>
+                </div>
+
+                <div class="rate-row">
+                    <span>2 - 5 Pages</span>
+                    <div class="rate-input">
+                        <span>₹</span>
+                        <input type="number" min="0" step="0.01" id="a4-price-2-5" value="{{ pricing.get('A4 Printing', {}).get('2-5', '') }}">
+                        <small>/ page</small>
+                    </div>
+                </div>
+
+                <div class="rate-row">
+                    <span>6 - 10 Pages</span>
+                    <div class="rate-input">
+                        <span>₹</span>
+                        <input type="number" min="0" step="0.01" id="a4-price-6-10" value="{{ pricing.get('A4 Printing', {}).get('6-10', '') }}">
+                        <small>/ page</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pricing-save-row">
+                <span class="pricing-message" id="a4-price-message"></span>
+                <button type="button" class="save-btn pricing-save-btn" onclick="savePrintingPrices('A4 Printing')">Save A4 Prices</button>
+            </div>
+        </div>
+
+        <!-- =================================================
+             PHOTO PRICING
+        ================================================== -->
+        <div class="pricing-service">
+            <div class="service-heading">
+                <div class="service-info">
+                    <div>
+                        <h3>Photo Printing</h3>
+                        <p>High quality photo printing</p>
+                    </div>
+                </div>
+                
+            </div>
+
+            <div class="rate-table">
+                <div class="rate-header">
+                    <span>Page Range</span>
+                    <span>Rate</span>
+                </div>
+
+                <div class="rate-row">
+                    <span>1 - 5 Pages</span>
+                    <div class="rate-input">
+                        <span>₹</span>
+                        <input type="number" min="0" step="0.01" id="photo-price-1-5" value="{{ pricing.get('Photo Print', {}).get('1-5', '') }}">
+                        <small>/ page</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pricing-save-row">
+                <span class="pricing-message" id="photo-price-message"></span>
+                <button type="button" class="save-btn pricing-save-btn" onclick="savePrintingPrices('Photo Print')">Save Photo Prices</button>
+            </div>
+        </div>
+
+        <!-- =================================================
+             STICKER PRICING
+        ================================================== -->
+        <div class="pricing-service">
+            <div class="service-heading">
+                <div class="service-info">
+                    <div>
+                        <h3>Sticker Printing</h3>
+                        <p>Adhesive sticker printing</p>
+                    </div>
+                </div>
+                
+            </div>
+
+            <div class="rate-table">
+                <div class="rate-header">
+                    <span>Page Range</span>
+                    <span>Rate</span>
+                </div>
+
+                <div class="rate-row">
+                    <span>1 - 5 Pages</span>
+                    <div class="rate-input">
+                        <span>₹</span>
+                        <input type="number" min="0" step="0.01" id="sticker-price-1-5" value="{{ pricing.get('Sticker Print', {}).get('1-5', '') }}">
+                        <small>/ page</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pricing-save-row">
+                <span class="pricing-message" id="sticker-price-message"></span>
+                <button type="button" class="save-btn pricing-save-btn" onclick="savePrintingPrices('Sticker Print')">Save Sticker Prices</button>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- =================================================
+         PAYMENT GATEWAY
+    ================================================== -->
+    <section class="settings-card payment-settings-card">
+        <div class="settings-title">
+            <div>
+                <h2>💳 Payment Gateway</h2>
+                <p>Connect Razorpay for UPI and UPI QR payments after placing a print order. Cash at Shop remains available separately.</p>
+            </div>
+            {% if payment_settings and payment_settings.is_enabled %}
+            <div class="payment-configured-badge">● Configured</div>
+            {% else %}
+            <div class="payment-configured-badge disabled">● Not configured</div>
+            {% endif %}
+        </div>
+
+        <div class="payment-form-grid">
+            <div class="input-group">
+                <label>Razorpay Key ID</label>
+                <input type="text" id="razorpay-key-id" value="{{ payment_settings.key_id if payment_settings else '' }}" placeholder="rzp_test_..." autocomplete="off">
+                <small>Use Razorpay Test Keys for development or Live Keys after your Razorpay account is approved for real payments. UPI QR is available only when the required Razorpay QR capability is enabled for the account.</small>
+            </div>
+            <div class="input-group">
+                <label>Razorpay Key Secret</label>
+                <input type="password" id="razorpay-key-secret" placeholder="Enter Key Secret" autocomplete="new-password">
+                <small>Stored on the server and never sent to students.</small>
+            </div>
+        </div>
+
+        <div class="payment-settings-actions">
+            <label class="payment-enable"><input type="checkbox" id="razorpay-enabled" {% if not payment_settings or payment_settings.is_enabled %}checked{% endif %}> Enable online payment</label>
+            <button type="button" class="save-btn" id="payment-save-btn" onclick="savePaymentSettings()">Save Payment Settings</button>
+        </div>
+        <div id="payment-settings-message" class="pricing-message"></div>
+    </section>
+
+
+    <!-- =================================================
+         SECURITY
+    ================================================== -->
+
+    <section class="settings-card">
+
+        <div class="settings-title">
+
+            <div>
+
+                <h2>
+                    🔐 Security
+                </h2>
+
+                <p>
+                    Manage your administrator account security.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <div class="password-section">
+
+
+            <div class="form-grid">
+
+
+                <!-- CURRENT PASSWORD -->
+
+                <div class="input-group">
+
+                    <label>
+                        Current Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="current-password"
+                        placeholder="Enter current password"
+                        autocomplete="off"
+                    >
+
+                </div>
+
+
+                <!-- NEW PASSWORD -->
+
+                <div class="input-group">
+
+                    <label>
+                        New Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="new-password"
+                        placeholder="Enter new password"
+                        autocomplete="new-password"
+                    >
+
+                </div>
+
+
+                <!-- CONFIRM PASSWORD -->
+
+                <div class="input-group">
+
+                    <label>
+                        Confirm New Password
+                    </label>
+
+                    <input
+                        type="password"
+                        id="confirm-password"
+                        placeholder="Confirm new password"
+                        autocomplete="new-password"
+                    >
+
+                </div>
+
+
+            </div>
+
+
+            <div class="password-actions">
+
+                <button
+                    type="button"
+                    onclick="changePassword()"
+                >
+                    Update Password
+                </button>
+
+
+                <button
+                    type="button"
+                    onclick="clearPasswordFields()"
+                >
+                    Clear
+                </button>
+
+            </div>
+
+
+            <p
+                id="password-message"
+                class="password-message"
+            ></p>
+
+
+        </div>
+
+
+        <div class="security-divider"></div>
+
+
+        <!-- LOGOUT ALL DEVICES -->
+
+</main>
+
+
+
+<!-- =====================================================
+     GENERAL WARNING POPUP
+===================================================== -->
+<div class="warning-overlay" id="warningOverlay">
+    <div class="warning-box">
+        <div class="warning-icon" id="warningIcon">!</div>
+        <h2 id="warningTitle">Notice</h2>
+        <p id="warningMessage"></p>
+        <div class="warning-buttons">
+            <button type="button" class="warning-cancel-btn" id="warningCancelBtn" onclick="closeWarning()" style="display:none;">Cancel</button>
+            <button type="button" class="warning-ok-btn" id="warningOkBtn" onclick="warningPrimaryAction()">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- =====================================================
+     FOOTER
+===================================================== -->
+
+<footer>
+
+    <div class="footer-content">
+
+
+        <div class="footer-column">
+
+            <h3>
+                Queue-Free Print
+            </h3>
+
+            <p>
+                Simple and convenient online printing
+                system for college students.
+            </p>
+
+        </div>
+
+
+        <div class="footer-column">
+
+            <h3>
+                Quick Links
+            </h3>
+
+            <a href="{{ url_for('admin_dashboard') }}">
+                Dashboard
+            </a>
+
+            <a href="{{ url_for('admin_dashboard') }}#orders">
+    Orders
+</a>
+
+            <a href="{{ url_for('analytics') }}">
+                Analytics
+            </a>
+
+            <a href="{{ url_for('settings') }}">
+                Settings
+            </a>
+
+        </div>
+
+
+    </div>
+
+
+    <div class="footer-bottom">
+
+        © 2026 Queue-Free Print | All Rights Reserved
+
+    </div>
+
+</footer>
+
+
+
+<!-- =====================================================
+     LOGOUT CONFIRMATION POPUP
+===================================================== -->
+
+<div class="logout-overlay" id="logoutPopup">
+
+    <div class="logout-box">
+
+        <div class="logout-icon">
+            ?
+        </div>
+
+        <h2>
+            Logout Confirmation
+        </h2>
+
+        <p>
+            Are you sure you want to logout?
+        </p>
+
+        <div class="logout-buttons">
+
+            <button
+                type="button"
+                class="cancel-logout-btn"
+                onclick="closeLogoutPopup()"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="button"
+                class="confirm-logout-btn"
+                onclick="logoutUser()"
+            >
+                Logout
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- =====================================================
+     JAVASCRIPT
+===================================================== -->
+
+<script>
+const qfpSavedShopLocation = {% if profile.latitude is not none and profile.longitude is not none %}{"lat": {{ profile.latitude|float }}, "lng": {{ profile.longitude|float }}}{% else %}null{% endif %};
+window.qfpSavedShopLocation = qfpSavedShopLocation;
+
+/* =====================================================
+   SHOP STATUS
+===================================================== */
+
+
+async function changeShopStatus() {
+
+    const toggle = document.getElementById("shop-toggle");
+    const statusText = document.getElementById("shop-status-text");
+    const message = document.getElementById("shop-message");
+    const requestedState = toggle.checked;
+
+    toggle.disabled = true;
+
+    try {
+        const form = new FormData();
+        form.append("is_open", requestedState ? "1" : "0");
+
+        const response = await fetch("{{ url_for('update_shop_status') }}", {
+            method: "POST",
+            body: form,
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Could not update shop status.");
+        }
+
+        toggle.checked = !!data.is_open;
+        statusText.textContent = data.is_open ? "Shop Open" : "Shop Closed";
+        message.textContent = data.is_open
+            ? "Students can currently place printing orders."
+            : "New printing orders are currently disabled.";
+
+    } catch (error) {
+        toggle.checked = !requestedState;
+        statusText.textContent = toggle.checked ? "Shop Open" : "Shop Closed";
+        message.textContent = toggle.checked
+            ? "Students can currently place printing orders."
+            : "New printing orders are currently disabled.";
+        showWarning(error.message || "Could not update shop status.", "Shop Status Update Failed");
+    } finally {
+        toggle.disabled = false;
+    }
+}
+
+
+
+/* =====================================================
+   PROFILE SETTINGS
+===================================================== */
+
+async function saveProfileChanges() {
+
+    const nameInput = document.getElementById("profile-name");
+    const emailInput = document.getElementById("profile-email");
+    const phoneInput = document.getElementById("profile-phone");
+    const button = document.getElementById("profile-save-btn");
+    const message = document.getElementById("profile-message");
+
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    const phone = phoneInput.value.trim();
+    const universityName = document.getElementById("profile-university").value.trim();
+    const state = document.getElementById("profile-state").value;
+    const shopName = document.getElementById("profile-shop-name").value.trim();
+    const address = document.getElementById("profile-address").value.trim();
+
+    message.textContent = "";
+    message.className = "profile-message";
+
+    if (!name || !universityName || !state || !shopName) {
+        message.textContent = "Full name, university / college, state and shop name are required.";
+        message.classList.add("error");
+        return;
+    }
+
+    if (!email) {
+        message.textContent = "Email is required.";
+        message.classList.add("error");
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+
+    try {
+        const form = new FormData();
+        form.append("name", name);
+        form.append("email", email);
+        form.append("phone", phone);
+        form.append("university_name", universityName);
+        form.append("state", state);
+        form.append("shop_name", shopName);
+        form.append("address", address);
+
+        const response = await fetch("{{ url_for('update_admin_profile') }}", {
+            method: "POST",
+            body: form,
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Could not save profile changes.");
+        }
+
+        nameInput.value = data.name;
+        emailInput.value = data.email;
+        phoneInput.value = data.phone || "";
+        document.getElementById("profile-university").value = data.university_name || universityName;
+        document.getElementById("profile-state").value = data.state || state;
+        document.getElementById("profile-shop-name").value = data.shop_name || shopName;
+        document.getElementById("profile-address").value = data.address || address;
+
+        message.textContent = data.message || "Profile changes saved successfully.";
+        message.classList.add("success");
+
+    } catch (error) {
+        message.textContent = error.message || "Could not save profile changes.";
+        message.classList.add("error");
+    } finally {
+        button.disabled = false;
+        button.textContent = "Save Changes";
+    }
+}
+
+
+/* =====================================================
+   CHANGE PASSWORD
+===================================================== */
+
+async function changePassword() {
+
+    const currentPassword = document.getElementById("current-password").value;
+    const newPassword = document.getElementById("new-password").value;
+    const confirmPassword = document.getElementById("confirm-password").value;
+    const message = document.getElementById("password-message");
+    const button = document.querySelector(".password-actions button");
+
+    message.textContent = "";
+    message.className = "password-message";
+
+    // All three fields must be filled.
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        message.textContent = "Please fill all password fields.";
+        message.classList.add("error");
+        return;
+    }
+
+    // A-Z, a-z, 0-9 and symbol; minimum 8 characters.
+    const passwordPattern = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+    if (!passwordPattern.test(newPassword)) {
+        message.textContent =
+            "New password must be at least 8 characters and include A-Z, a-z, 0-9 and a symbol.";
+        message.classList.add("error");
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        message.textContent = "New password and confirm password do not match.";
+        message.classList.add("error");
+        return;
+    }
+
+    if (currentPassword === newPassword) {
+        message.textContent = "New password must be different from the current password.";
+        message.classList.add("error");
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Updating...";
+
+    try {
+        const form = new FormData();
+        form.append("current_password", currentPassword);
+        form.append("new_password", newPassword);
+        form.append("confirm_password", confirmPassword);
+
+        const response = await fetch("{{ url_for('change_admin_password') }}", {
+            method: "POST",
+            body: form,
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Password could not be updated.");
+        }
+
+        message.textContent = "Password updated successfully.";
+        message.classList.add("success");
+
+        clearPasswordFields();
+
+        // Keep the success message after clearing the fields.
+        message.textContent = "Password updated successfully.";
+        message.classList.add("success");
+
+    } catch (error) {
+        message.textContent = error.message || "Password could not be updated.";
+        message.classList.add("error");
+    } finally {
+        button.disabled = false;
+        button.textContent = "Update Password";
+    }
+}
+
+function clearPasswordFields() {
+
+    document.getElementById("current-password").value = "";
+    document.getElementById("new-password").value = "";
+    document.getElementById("confirm-password").value = "";
+
+    const message = document.getElementById("password-message");
+    message.textContent = "";
+    message.className = "password-message";
+}
+
+// Never pre-fill password fields when the Settings page opens.
+window.addEventListener("DOMContentLoaded", clearPasswordFields);
+
+
+
+function showWarning(message, title = "Notice", icon = "!", primaryAction = null) {
+    document.getElementById("warningTitle").textContent = title;
+    document.getElementById("warningMessage").textContent = message;
+    document.getElementById("warningIcon").textContent = icon;
+    window.warningPrimary = primaryAction;
+    document.getElementById("warningCancelBtn").style.display = primaryAction ? "inline-block" : "none";
+    document.getElementById("warningOkBtn").textContent = primaryAction ? "Yes, Continue" : "OK";
+    document.getElementById("warningOverlay").style.display = "flex";
+}
+function closeWarning() {
+    document.getElementById("warningOverlay").style.display = "none";
+    window.warningPrimary = null;
+}
+function warningPrimaryAction() {
+    const action = window.warningPrimary;
+    if (typeof action === "function") action();
+    else closeWarning();
+}
+
+/* =====================================================
+   CLEAR PASSWORD
+===================================================== */
+
+function clearPasswordFields() {
+
+    document.getElementById(
+        "current-password"
+    ).value = "";
+
+    document.getElementById(
+        "new-password"
+    ).value = "";
+
+    document.getElementById(
+        "confirm-password"
+    ).value = "";
+
+
+    const message =
+        document.getElementById(
+            "password-message"
+        );
+
+    message.textContent = "";
+
+}
+
+
+
+/* =====================================================
+   PRINTING PRICES
+===================================================== */
+
+async function savePrintingPrices(printType) {
+    const config = {
+        "A4 Printing": {
+            messageId: "a4-price-message",
+            buttonText: "Save A4 Prices",
+            fields: [
+                [1, 1, "a4-price-1"],
+                [2, 5, "a4-price-2-5"],
+                [6, 10, "a4-price-6-10"]
+            ]
+        },
+        "Photo Print": {
+            messageId: "photo-price-message",
+            buttonText: "Save Photo Prices",
+            fields: [[1, 5, "photo-price-1-5"]]
+        },
+        "Sticker Print": {
+            messageId: "sticker-price-message",
+            buttonText: "Save Sticker Prices",
+            fields: [[1, 5, "sticker-price-1-5"]]
+        }
+    };
+
+    const settings = config[printType];
+    const message = document.getElementById(settings.messageId);
+    const button = message.parentElement.querySelector("button");
+    message.textContent = "";
+    message.className = "pricing-message";
+
+    const form = new FormData();
+    form.append("print_type", printType);
+
+    for (const [minPages, maxPages, inputId] of settings.fields) {
+        const input = document.getElementById(inputId);
+        const value = input.value.trim();
+        if (value === "" || Number(value) < 0) {
+            message.textContent = "Enter a valid price for every range.";
+            message.classList.add("error");
+            input.focus();
+            return;
+        }
+        form.append(`price_${minPages}_${maxPages}`, value);
+    }
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+
+    try {
+        const response = await fetch("{{ url_for('save_printing_prices') }}", {
+            method: "POST",
+            body: form,
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Could not save printing prices.");
+        }
+
+        message.textContent = data.message || "Prices saved successfully.";
+        message.classList.add("success");
+    } catch (error) {
+        message.textContent = error.message || "Could not save printing prices.";
+        message.classList.add("error");
+    } finally {
+        button.disabled = false;
+        button.textContent = settings.buttonText;
+    }
+}
+
+
+/* =====================================================
+   PAYMENT GATEWAY
+===================================================== */
+async function savePaymentSettings() {
+    const keyId = document.getElementById("razorpay-key-id").value.trim();
+    const secret = document.getElementById("razorpay-key-secret").value.trim();
+    const enabled = document.getElementById("razorpay-enabled").checked;
+    const message = document.getElementById("payment-settings-message");
+    const button = document.getElementById("payment-save-btn");
+    message.textContent = "";
+    message.className = "pricing-message";
+
+    if (!keyId || !secret) {
+        message.textContent = "Enter both Razorpay Key ID and Key Secret.";
+        message.classList.add("error");
+        return;
+    }
+    if (!/^rzp_(test|live)_/.test(keyId)) {
+        message.textContent = "Enter a valid Razorpay Key ID.";
+        message.classList.add("error");
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+    try {
+        const form = new FormData();
+        form.append("razorpay_key_id", keyId);
+        form.append("razorpay_key_secret", secret);
+        form.append("enabled", enabled ? "1" : "0");
+        const response = await fetch("{{ url_for('save_payment_settings') }}", {
+            method: "POST", body: form, credentials: "same-origin", cache: "no-store"
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || "Could not save payment settings.");
+        message.textContent = data.message;
+        message.classList.add("success");
+        document.getElementById("razorpay-key-secret").value = "";
+    } catch (error) {
+        message.textContent = error.message || "Could not save payment settings.";
+        message.classList.add("error");
+    } finally {
+        button.disabled = false;
+        button.textContent = "Save Payment Settings";
+    }
+}
+
+
+/* =====================================================
+   SAVE SETTINGS
+===================================================== */
+
+function saveSettings() {
+    showWarning("Settings saved successfully.", "Settings Saved", "✓");
+}
+
+
+
+/* =====================================================
+   RESET SETTINGS
+===================================================== */
+
+function resetSettings() {
+    showWarning("Are you sure you want to reset the settings?", "Reset Settings", "?", () => {
+        closeWarning();
+        location.reload();
+    });
+}
+
+
+
+/* =====================================================
+   LOGOUT ALL DEVICES
+===================================================== */
+
+function logoutAll() {
+    showWarning("Logout from all devices?", "Logout Confirmation", "?", () => {
+        closeWarning();
+        window.location.href = "/logout";
+    });
+}
+
+
+
+/* =====================================================
+   LOGOUT CONFIRMATION
+===================================================== */
+
+function confirmLogout(event) {
+
+    event.preventDefault();
+
+    document.getElementById(
+        "logoutPopup"
+    ).style.display = "flex";
+
+}
+
+
+function closeLogoutPopup() {
+
+    document.getElementById(
+        "logoutPopup"
+    ).style.display = "none";
+
+}
+
+
+function logoutUser() {
+
+    window.location.href = "{{ url_for('logout') }}";
+
+}
+
+
+document.getElementById(
+    "logoutPopup"
+).addEventListener(
+    "click",
+    function(event) {
+
+        if (event.target === this) {
+
+            closeLogoutPopup();
+
+        }
+
+    }
+);
+
+</script>
+
+
+</body>
+
+</html>

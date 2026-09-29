@@ -1,0 +1,2217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Student Dashboard | Queue-Free Print</title>
+
+    <link rel="stylesheet"
+          href="../static/student_dashboard.css">
+
+
+<script>
+/* Prevent browser back/BFCache from reopening a protected page after logout. */
+window.addEventListener("pageshow", async function (event) {
+    if (!event.persisted) return;
+
+    try {
+        const response = await fetch("{{ url_for('session_status') }}", {
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const data = await response.json();
+
+        if (!data.logged_in) {
+            window.location.replace("{{ url_for('home') }}");
+        }
+    } catch (e) {
+        window.location.replace("{{ url_for('home') }}");
+    }
+});
+</script>
+
+
+<script>
+/* Re-check authentication whenever this protected page is shown, including browser Back/BFCache. */
+(function () {
+    const homeUrl = "{{ url_for('home') }}";
+    const statusUrl = "{{ url_for('session_status') }}";
+
+    async function verifySession() {
+        try {
+            const response = await fetch(statusUrl, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache" }
+            });
+            const data = await response.json();
+
+            if (!data.logged_in) {
+                window.location.replace(homeUrl);
+            }
+        } catch (error) {
+            window.location.replace(homeUrl);
+        }
+    }
+
+    window.addEventListener("pageshow", verifySession);
+})();
+</script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="{{ url_for('static', filename='notifications.js') }}" defer></script>
+    <link rel="stylesheet" href="../static/responsive.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='nearby_shops.css') }}">
+    <script src="{{ url_for('static', filename='nearby_shops.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='government_assistant_widget.css') }}">
+    <script src="{{ url_for('static', filename='government_assistant_widget.js') }}" defer></script>
+</head>
+
+
+<body data-user-role="user">
+
+
+<!-- ================= NAVBAR ================= -->
+
+<nav>
+    <div class="logo">Queue-Free <span>Print</span></div>
+    <div class="nav-links">
+        <a href="{{ url_for('user_dashboard') }}#dashboard">Dashboard</a>
+        <a href="{{ url_for('delivery_scan') }}">Scan QR</a>
+        <a href="{{ url_for('recent_orders') }}">Recent Orders</a>
+        <a class="notification-link" href="#" onclick="qfpOpenNotifications(event)">Notifications <span class="notification-badge" id="notificationBadge" hidden>0</span></a>
+        <a href="{{ url_for('profile') }}">Profile</a>
+        <a href="#" onclick="confirmLogout(event)">Logout</a>
+    </div>
+</nav>
+
+
+
+<!-- ================= DASHBOARD ================= -->
+
+<main class="dashboard"
+      id="dashboard">
+
+
+    <!-- ================= WELCOME ================= -->
+
+    <section class="welcome">
+
+        <h1 id="studentWelcome">
+
+            Welcome, <span id="studentWelcomeName">{{ name }}</span> 👋
+
+        </h1>
+
+        <p>
+
+            Upload your document and select your printing
+            requirements to place a new order.
+
+        </p>
+        <button type="button" class="qfp-govt-btn" id="qfpGovtAssistantBtn" onclick="qfpOpenGovernmentAssistant()">🤖 Govt. Assistant</button>
+        <button type="button" class="qfp-nearby-btn" id="qfpNearbyBtn" onclick="qfpOpenNearbyShops()">📍 Locate Nearby Shops</button>
+
+    </section>
+
+
+
+    <!-- ================= NEW ORDER ================= -->
+
+    <section class="order-container"
+             id="new-order">
+
+
+        <h2>
+
+            🖨️ Create New Print Order
+
+        </h2>
+
+
+        <p class="subtitle">
+
+            Upload your document and select your
+            printing preferences.
+
+        </p>
+
+
+
+        <!-- ================= SHOP FILTERS ================= -->
+        <div class="shop-filter-bar">
+            <div class="shop-filter state-filter-wrap">
+                <label for="shop-state-toggle">State</label>
+                {% set states = [] %}
+                {% for shop in shops %}
+                    {% if shop.state and shop.state not in states %}{% set _ = states.append(shop.state) %}{% endif %}
+                {% endfor %}
+                <div class="state-filter-dropdown" id="state-filter-dropdown">
+                    <button type="button" class="shop-filter-input state-filter-toggle" id="shop-state-toggle" aria-haspopup="listbox" aria-expanded="false">
+                        <span id="shop-state-label">All states</span>
+                        <span class="state-filter-chevron">▾</span>
+                    </button>
+                    <div class="state-filter-menu" id="shop-state-menu" role="listbox">
+                        <input type="search" id="shop-state-search" class="state-filter-search" placeholder="Search state..." autocomplete="off">
+                        <button type="button" class="state-filter-option active" data-value="">All states</button>
+                        <div id="shop-state-options-list">
+                            {% for st in states|sort %}
+                            <button type="button" class="state-filter-option" data-value="{{ st }}">{{ st }}</button>
+                            {% endfor %}
+                        </div>
+                        <div class="state-filter-empty" id="shop-state-empty" hidden>No state found</div>
+                    </div>
+                    <input type="hidden" id="shop-state" value="">
+                </div>
+            </div>
+
+            <div class="shop-filter">
+                <label for="shop-university">University / College</label>
+                <input id="shop-university" class="shop-filter-input" list="shop-university-options" placeholder="All universities / colleges" autocomplete="off" oninput="filterShops()">
+                <datalist id="shop-university-options">
+                    {% set universities = [] %}
+                    {% for shop in shops %}
+                        {% if shop.university_name and shop.university_name not in universities %}{% set _ = universities.append(shop.university_name) %}{% endif %}
+                    {% endfor %}
+                    {% for university in universities|sort %}<option value="{{ university }}">{% endfor %}
+                </datalist>
+            </div>
+        </div>
+
+        <div class="form-section shop-selection-section">
+            <h3>Select Print Shop</h3>
+            <select id="shop-id" class="normal-input" required onchange="updateEstimatedCost()">
+                <option value="" selected>Select Shop</option>
+                {% for shop in shops %}
+                <option value="{{ shop.shop_id }}" data-state="{{ shop.state or '' }}" data-university="{{ shop.university_name or '' }}">{{ shop.shop_number }} - {{ shop.shop_name }}{% if not shop.is_open %} (Closed){% endif %}</option>
+                {% endfor %}
+            </select>
+            <p class="small-text">Use the filters above to narrow the list, or select a shop directly.</p>
+        </div>
+
+
+        <!-- ================= DOCUMENT ================= -->
+
+        <div class="form-section">
+
+            <h3>
+
+                Upload Document
+
+                <!-- <span class="required">*</span> -->
+
+            </h3>
+
+
+            <label class="upload-box" id="uploadBox">
+
+                <input
+                    type="file"
+                    id="document-file"
+                    accept="*/*"
+                    multiple
+                >
+
+                <div>
+
+                    <span class="upload-icon">📄</span>
+
+                    <h4>Upload your documents</h4>
+
+                    <p>Select one or more document/file types</p>
+
+                </div>
+
+            </label>
+
+            <div id="uploaded-documents" class="uploaded-documents"></div>
+
+        </div>
+
+
+
+        <!-- ================= COPIES ================= -->
+
+        <div class="form-section">
+
+
+            <h3>
+
+                Number of Copies
+
+                <!-- <span class="required">*</span> -->
+
+            </h3>
+
+
+            <input
+                type="number"
+                id="copies"
+                min="1"
+                value="1"
+                class="normal-input"
+                oninput="updateEstimatedCost()"
+            >
+
+        </div>
+
+
+
+        <!-- ================= COLOR ================= -->
+
+        <div class="form-section">
+
+
+            <h3>
+
+                Printing Color
+
+                <!-- <span class="required">*</span> -->
+
+            </h3>
+
+
+            <div class="options">
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="color"
+                        value="black_white"
+                        checked
+                    >
+
+                    ⚫ Black & White
+
+                </label>
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="color"
+                        value="color"
+                    >
+
+                    🌈 Color
+
+                </label>
+
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================= ORIENTATION ================= -->
+
+        <div class="form-section">
+
+
+            <h3>
+
+                Page Orientation
+
+                <!-- <span class="required">*</span> -->
+
+            </h3>
+
+
+            <div class="options">
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="orientation"
+                        value="portrait"
+                        checked
+                    >
+
+                    📄 Portrait
+
+                </label>
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="orientation"
+                        value="landscape"
+                    >
+
+                    🖼️ Landscape
+
+                </label>
+
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================= PRINT SIDE ================= -->
+
+        <div class="form-section">
+
+
+            <h3>
+
+                Print Side
+
+                <!-- <span class="required">*</span> -->
+
+            </h3>
+
+
+            <div class="options">
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="side"
+                        value="single"
+                        checked
+                    >
+
+                    📄 Single-Sided
+
+                </label>
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="side"
+                        value="double"
+                    >
+
+                    📑 Double-Sided
+
+                </label>
+
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================= PAGE RANGE ================= -->
+
+        <div class="form-section">
+
+
+            <h3>
+
+                Page Range
+
+                <!-- <span class="required">*</span> -->
+
+            </h3>
+
+
+            <div class="options">
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="pages"
+                        value="all"
+                        checked
+                        onchange="togglePageRange()"
+                    >
+
+                    All Pages
+
+                </label>
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="pages"
+                        value="custom"
+                        onchange="togglePageRange()"
+                    >
+
+                    Custom Range
+
+                </label>
+
+
+            </div>
+
+
+
+            <div id="custom-range"
+                 style="display: none;">
+
+
+                <input
+                    type="text"
+                    id="page-range-input"
+                    class="normal-input"
+                    placeholder="Example: 1-5, 8, 10-12"
+                >
+
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================= PAPER TYPE ================= -->
+
+        <div class="form-section">
+
+
+            <h3>
+
+                Paper Type
+
+            </h3>
+
+
+            <div class="options">
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="paper"
+                        value="printing"
+                        checked
+                        onchange="updateEstimatedCost()"
+                    >
+
+                    📄 Printing Paper
+
+                </label>
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="paper"
+                        value="photo"
+                        onchange="updateEstimatedCost()"
+                    >
+
+                    🖼️ Photo Paper
+
+                </label>
+
+
+                <label class="option">
+
+                    <input
+                        type="radio"
+                        name="paper"
+                        value="sticker"
+                        onchange="updateEstimatedCost()"
+                    >
+
+                    🏷️ Sticker Paper
+
+                </label>
+
+
+            </div>
+
+        </div>
+
+
+
+        <!-- ================= ADDITIONAL REQUIREMENTS ================= -->
+
+        <div class="form-section">
+
+
+            <h3>
+
+                Additional Requirements
+
+            </h3>
+
+
+            <textarea
+                id="additional-requirements"
+                placeholder="Enter any special instructions..."
+            ></textarea>
+
+
+        </div>
+
+
+
+        <!-- ================= AI ANALYSIS ================= -->
+
+        <div class="ai-check-box">
+
+
+            <h3>
+
+                🤖 AI Document Analysis
+
+            </h3>
+
+
+            <p>
+
+                Before placing the order, AI will check
+                the document for blank pages, duplicate
+                pages and non-visible text.
+
+            </p>
+
+
+            <button
+                type="button"
+                class="ai-btn"
+                onclick="analyzeDocument()">
+
+                🔍 Analyze Documents
+
+            </button>
+
+
+            <div id="ai-result"></div>
+
+
+        </div>
+
+
+
+        <!-- ================= COST ================= -->
+
+        <div class="cost-box">
+
+
+            <div>
+
+                <span>
+
+                    Estimated Cost
+
+                </span>
+
+
+                <h2 id="estimated-cost">
+
+                    ₹ 0.00
+
+                </h2>
+
+            </div>
+
+
+            <p>
+
+                Final cost may vary according to
+                the selected printing options.
+
+            </p>
+
+
+        </div>
+
+
+
+        <!-- ================= AI PRINT PREVIEW ================= -->
+
+        <button
+            type="button"
+            class="preview-order-btn"
+            id="preview-order-btn"
+            onclick="previewPrint()">
+
+            👁️ Preview Print
+
+        </button>
+
+
+        <!-- ================= PLACE ORDER ================= -->
+
+        <button
+            type="button"
+            class="order-btn"
+            onclick="placeOrder()">
+
+            Place Print Order
+
+        </button>
+
+
+    </section>
+
+
+</main>
+
+
+
+<!-- ==================================================
+     AI PRINT PREVIEW
+================================================== -->
+<section class="print-preview-modal" id="printPreviewModal" aria-hidden="true">
+    <div class="print-preview-card">
+        <div class="print-preview-header">
+            <div>
+                <span class="preview-eyebrow">AI PRINT PREVIEW</span>
+                <h2>See how your document will be printed</h2>
+                <p id="preview-summary">Gemini will analyze your preferences and additional requirements.</p>
+            </div>
+            <button type="button" class="preview-close-btn" onclick="closePrintPreview()" aria-label="Close preview">×</button>
+        </div>
+        <div id="preview-analysis" class="preview-analysis"></div>
+        <div id="preview-sheets" class="preview-sheets"></div>
+        <div class="preview-footer">
+            <span id="preview-engine"></span>
+            <button type="button" class="preview-done-btn" onclick="closePrintPreview()">Back to Order</button>
+        </div>
+    </div>
+</section>
+
+
+<!-- ==================================================
+     PAYMENT SCREEN - SHOWN AFTER PLACE ORDER
+================================================== -->
+<section class="payment-screen" id="paymentScreen" style="display:none;">
+    <div class="payment-card">
+        <div class="payment-brand">Queue-Free <span>Print</span></div>
+        <div class="payment-lock">🔒</div>
+        <h1>Choose Payment Method</h1>
+        <p class="payment-subtitle">Select how you want to pay for this print order.</p>
+        <div class="payment-summary">
+            <div><span>Order ID</span><strong id="paymentOrderId">#QFP000000</strong></div>
+            <div><span>Print Shop</span><strong id="paymentShop">-</strong></div>
+            <div><span>Amount Payable</span><strong id="paymentAmount">₹ 0.00</strong></div>
+        </div>
+        <div class="payment-choice-grid">
+            <button type="button" class="payment-choice selected" id="upiPaymentChoice" onclick="selectPaymentChoice('upi')">
+                <span class="payment-choice-icon">UPI</span>
+                <span><strong>UPI</strong><small>Pay through Razorpay UPI</small></span>
+                <span class="choice-check">✓</span>
+            </button>
+            <button type="button" class="payment-choice" id="qrPaymentChoice" onclick="selectPaymentChoice('qr')">
+                <span class="payment-choice-icon">▦</span>
+                <span><strong>Scan UPI QR</strong><small>Scan with any UPI app</small></span>
+                <span class="choice-check">✓</span>
+            </button>
+            <button type="button" class="payment-choice" id="cashPaymentChoice" onclick="selectPaymentChoice('cash')">
+                <span class="payment-choice-icon">₹</span>
+                <span><strong>Cash at Shop</strong><small>Pay cash when you collect your printout</small></span>
+                <span class="choice-check">✓</span>
+            </button>
+        </div>
+        <div id="qrPaymentPanel" class="qr-payment-panel" style="display:none;">
+            <div class="qr-payment-heading"><strong>Scan & Pay</strong><span id="qrPaymentStatus">Waiting for payment</span></div>
+            <div class="qr-payment-image-wrap"><img id="paymentQrImage" src="" alt="QueueFree UPI payment QR"></div>
+            <strong id="qrPaymentAmount">₹0.00</strong>
+            <p>Scan this QR with Google Pay, PhonePe, Paytm or any UPI app.</p>
+            <small id="qrPaymentHint">Do not close this screen until payment is confirmed.</small>
+        </div>
+        <button type="button" class="pay-now-btn" id="payNowBtn" onclick="continueWithSelectedPayment()">Continue</button>
+        <button type="button" class="payment-cancel-btn" onclick="cancelPendingPayment()">Cancel</button>
+        <p class="payment-note" id="paymentNote">UPI payments are verified by QueueFree against Razorpay before the order is marked Paid.</p>
+        <div id="paymentError" class="payment-error" style="display:none;"></div>
+    </div>
+</section>
+
+<!-- ==================================================
+     ORDER PLACED SUCCESS SCREEN
+================================================== -->
+
+<section class="order-success"
+         id="orderSuccess">
+
+
+    <div class="success-card">
+
+
+        <!-- SUCCESS ICON -->
+
+        <div class="success-icon">
+
+            ✓
+
+        </div>
+
+
+        <h1>
+
+            Order Placed Successfully!
+
+        </h1>
+
+
+        <p class="success-message">
+
+            Your print order has been successfully placed.
+
+        </p>
+
+
+
+        <!-- ORDER ID -->
+
+        <div class="order-id-box">
+
+            <span>
+
+                Order ID
+
+            </span>
+
+
+            <strong id="generatedOrderId">
+
+                #QFP000000
+
+            </strong>
+
+        </div>
+
+
+
+        <!-- ================= ORDER DETAILS ================= -->
+
+        <div class="success-details">
+
+
+            <div class="detail-row">
+
+                <span>
+
+                    🖨️ Shop ID
+
+                </span>
+
+
+                <strong id="successShop">
+
+                    -
+
+                </strong>
+
+            </div>
+
+
+            <div class="detail-row">
+
+                <span>
+
+                    💰 Estimated Cost
+
+                </span>
+
+
+                <strong id="successCost">
+
+                    ₹ 0.00
+
+                </strong>
+
+            </div>
+
+
+            <div class="detail-row">
+
+                <span>
+
+                    💳 Payment
+
+                </span>
+
+
+                <strong id="successPaymentMethod">-</strong>
+
+            </div>
+
+
+            <div class="detail-row">
+
+                <span>
+
+                    📄 Copies
+
+                </span>
+
+
+                <strong id="successCopies">
+
+                    1
+
+                </strong>
+
+            </div>
+
+
+        </div>
+
+
+
+        <!-- COLLECTION MESSAGE -->
+
+        <p class="collection-message">
+
+            🔔 You will be notified when your order
+            is ready for collection.
+
+        </p>
+
+
+
+        <!-- ================= BUTTONS ================= -->
+
+        <div class="success-buttons">
+
+
+            <a
+                href="{{ url_for('recent_orders') }}"
+                class="view-order-btn">
+
+                View Order
+
+            </a>
+
+
+            <button
+                type="button"
+                class="back-dashboard-btn"
+                onclick="backToDashboard()">
+
+                Back to Dashboard
+
+            </button>
+
+
+        </div>
+
+
+    </div>
+
+</section>
+
+
+
+<!-- ==================================================
+     NOTIFICATION POPUP
+================================================== -->
+
+<div class="notification-overlay"
+     id="notificationPopup">
+
+
+    <div class="notification-box">
+
+
+        <div class="notification-header">
+
+
+            <h2>
+
+                🔔 Notifications
+
+            </h2>
+
+
+            <button
+                type="button"
+                onclick="closeNotifications()">
+
+                ✕
+
+            </button>
+
+
+        </div>
+
+
+
+        <div class="notification-list" id="notificationList"></div>
+
+        <div class="no-notification" id="noNotification" style="display:flex;">
+            <div>🔕</div>
+            <h3>No Notifications</h3>
+            <p>You don't have any notifications right now.</p>
+        </div>
+
+
+    </div>
+
+
+</div>
+
+
+
+<!-- ==================================================
+     LOGOUT CONFIRMATION POPUP
+================================================== -->
+
+<div class="logout-overlay"
+     id="logoutPopup">
+
+
+    <div class="logout-box">
+
+
+        <div class="logout-icon">
+
+            ?
+
+        </div>
+
+
+        <h2>
+
+            Logout Confirmation
+
+        </h2>
+
+
+        <p>
+
+            Are you sure you want to logout?
+
+        </p>
+
+
+        <div class="logout-buttons">
+
+
+            <button
+                type="button"
+                class="cancel-logout-btn"
+                onclick="closeLogoutPopup()">
+
+                Cancel
+
+            </button>
+
+
+            <button
+                type="button"
+                class="confirm-logout-btn"
+                onclick="logoutUser()">
+
+                Logout
+
+            </button>
+
+
+        </div>
+
+
+    </div>
+
+
+</div>
+
+
+
+<!-- ================= GENERAL WARNING POPUP ================= -->
+<div class="warning-overlay" id="warningOverlay">
+    <div class="warning-box">
+        <div class="warning-icon" id="warningIcon">!</div>
+        <h2 id="warningTitle">Notice</h2>
+        <p id="warningMessage"></p>
+        <button type="button" class="warning-ok-btn" onclick="closeWarning()">OK</button>
+    </div>
+</div>
+
+<!-- ================= FOOTER ================= -->
+
+<footer>
+
+
+    <div class="footer-content">
+
+
+        <!-- ABOUT -->
+
+        <div class="footer-column">
+
+
+            <h3>
+
+                Queue-Free Print
+
+            </h3>
+
+
+            <p>
+
+                Simple and convenient online printing
+                system for college students.
+
+            </p>
+
+
+        </div>
+
+
+
+        <!-- QUICK LINKS -->
+
+        <div class="footer-column">
+
+
+            <h3>
+
+                Quick Links
+
+            </h3>
+
+
+            <a href="#dashboard">
+
+                Dashboard
+
+            </a>
+            
+            <a href="{{ url_for('recent_orders') }}">
+
+                Recent Orders
+
+            </a>
+
+
+            <a class="notification-link" href="#"
+               onclick="qfpOpenNotifications(event)">
+
+                Notifications
+
+            </a>
+
+
+            <a href="{{ url_for('profile') }}">
+
+                Profile
+
+            </a>
+
+
+        </div>
+
+
+    </div>
+
+
+
+    <div class="footer-bottom">
+
+        © 2026 Queue-Free Print |
+        All Rights Reserved
+
+    </div>
+
+
+</footer>
+
+
+
+<!-- ==================================================
+     JAVASCRIPT
+================================================== -->
+
+<script>
+
+
+/* =================================
+   PAGE RANGE
+================================= */
+
+function showWarning(message, title = "Notice") {
+    document.getElementById("warningTitle").textContent = title;
+    document.getElementById("warningMessage").textContent = message;
+    document.getElementById("warningOverlay").style.display = "flex";
+}
+function closeWarning() {
+    document.getElementById("warningOverlay").style.display = "none";
+}
+
+function togglePageRange() {
+
+
+    const custom =
+        document.querySelector(
+            'input[name="pages"][value="custom"]'
+        );
+
+
+    const range =
+        document.getElementById(
+            "custom-range"
+        );
+
+
+    const rangeInput =
+        document.getElementById(
+            "page-range-input"
+        );
+
+
+    if (custom.checked) {
+
+        range.style.display = "block";
+
+        rangeInput.required = false;
+
+    }
+
+    else {
+
+        range.style.display = "none";
+
+        rangeInput.required = false;
+
+        rangeInput.value = "";
+
+    }
+
+}
+
+
+
+/* =================================
+   NOTIFICATIONS
+================================= */
+function openNotifications(event) { return qfpOpenNotifications(event); }
+function closeNotifications() { return qfpCloseNotifications(); }
+
+
+/* =================================
+   DOCUMENT UPLOAD DISPLAY
+================================= */
+const documentInput = document.getElementById("document-file");
+const uploadBox = document.getElementById("uploadBox");
+const uploadedDocuments = document.getElementById("uploaded-documents");
+let selectedFiles = [];
+let latestAIAnalysis = {total_pages: 0, blank_pages: 0, blurry_pages: 0, unrecognizable_pages: 0};
+let documentAnalysisCompleted = false;
+let documentAnalyses = [];
+let previewObjectUrls = [];
+let latestPrintPreviewPlan = null;
+
+if (documentInput) {
+    documentInput.addEventListener("change", function () {
+        const newFiles = Array.from(this.files || []);
+        if (!newFiles.length) return;
+
+        selectedFiles = selectedFiles.concat(newFiles);
+        syncDocumentInput();
+        resetDocumentAnalysis();
+        renderUploadedDocuments();
+    });
+}
+
+function syncDocumentInput() {
+    const transfer = new DataTransfer();
+    selectedFiles.forEach(file => transfer.items.add(file));
+    documentInput.files = transfer.files;
+}
+
+function renderUploadedDocuments() {
+    uploadedDocuments.innerHTML = "";
+    selectedFiles.forEach((file, index) => {
+        const row = document.createElement("div");
+        row.className = "uploaded-document";
+        row.innerHTML = `
+            <div class="uploaded-file-icon">📄</div>
+            <div class="uploaded-file-info">
+                <strong title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</strong>
+                <span>${formatFileSize(file.size)} • Ready for printing</span>
+            </div>
+            <button type="button" class="remove-upload-btn" onclick="removeDocument(${index})" aria-label="Remove ${escapeHtml(file.name)}">×</button>
+        `;
+        uploadedDocuments.appendChild(row);
+    });
+}
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+    }[char]));
+}
+
+function removeDocument(index) {
+    selectedFiles.splice(index, 1);
+    syncDocumentInput();
+    resetDocumentAnalysis();
+    renderUploadedDocuments();
+}
+
+function resetDocumentAnalysis() {
+    documentAnalysisCompleted = false;
+    latestAIAnalysis = {total_pages: 0, blank_pages: 0, blurry_pages: 0, unrecognizable_pages: 0};
+    documentAnalyses = [];
+    const result = document.getElementById("ai-result");
+    if (result) {
+        result.innerHTML = selectedFiles.length
+            ? `<div class="ai-error">Please analyze all selected documents before placing the order.</div>`
+            : "";
+    }
+    document.getElementById("estimated-cost").textContent = "₹ 0.00";
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return "0 KB";
+    const units = ["B", "KB", "MB", "GB"];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + " " + units[i];
+}
+
+
+/* =================================
+   AI DOCUMENT ANALYSIS
+================================= */
+function analyzeDocument() {
+    const result = document.getElementById("ai-result");
+    if (!selectedFiles.length) {
+        result.innerHTML = `<div class="ai-error">Please upload at least one document first.</div>`;
+        return;
+    }
+
+    const data = new FormData();
+    selectedFiles.forEach(file => data.append("documents", file));
+    result.innerHTML = `<div class="ai-loading">🤖 Gemini is scanning ${selectedFiles.length} document${selectedFiles.length === 1 ? "" : "s"}...</div>`;
+
+    fetch("/analyze-documents", { method: "POST", body: data })
+        .then(r => r.json().then(j => ({ok:r.ok, data:j})))
+        .then(({ok, data}) => {
+            if (!ok || !data.success) {
+                result.innerHTML = `<div class="ai-error">❌ ${data.error || "AI analysis failed."}</div>`;
+                documentAnalysisCompleted = false;
+                return;
+            }
+
+            documentAnalyses = data.results || [];
+            latestAIAnalysis = {
+                total_pages: documentAnalyses.reduce((sum, item) => sum + Number(item.total_pages || 0), 0),
+                blank_pages: documentAnalyses.reduce((sum, item) => sum + Number(item.blank_pages || 0), 0),
+                blurry_pages: documentAnalyses.reduce((sum, item) => sum + Number(item.blurry_pages || 0), 0),
+                unrecognizable_pages: documentAnalyses.reduce((sum, item) => sum + Number(item.unrecognizable_pages || 0), 0)
+            };
+            documentAnalysisCompleted = documentAnalyses.length === selectedFiles.length && latestAIAnalysis.total_pages > 0;
+
+            result.innerHTML = `
+                <div class="ai-success">
+                    <strong>✅ Gemini analysis completed for all documents</strong><br><br>
+                    Documents: <b>${documentAnalyses.length}</b><br>
+                    Total pages: <b>${latestAIAnalysis.total_pages}</b><br>
+                    Blank pages: <b>${latestAIAnalysis.blank_pages}</b><br>
+                    Blurry pages: <b>${latestAIAnalysis.blurry_pages}</b><br>
+                    Unrecognizable text: <b>${latestAIAnalysis.unrecognizable_pages}</b><br><br>
+                    All selected documents are ready for printing.
+                </div>`;
+            updateEstimatedCost();
+        })
+        .catch(() => {
+            documentAnalysisCompleted = false;
+            result.innerHTML = `<div class="ai-error">❌ Could not connect to the AI service.</div>`;
+        });
+}
+
+
+/* =================================
+   ESTIMATED PRINTING COST
+================================= */
+let costRequestNumber = 0;
+
+async function updateEstimatedCost() {
+    const costElement = document.getElementById("estimated-cost");
+    const shopId = document.getElementById("shop-id")?.value;
+    const copies = Number(document.getElementById("copies")?.value || 1);
+    const paperType = document.querySelector('input[name="paper"]:checked')?.value || "printing";
+    const totalPages = Number(latestAIAnalysis?.total_pages || 0);
+
+    if (!shopId || totalPages <= 0 || copies < 1) {
+        costElement.textContent = "₹ 0.00";
+        return;
+    }
+
+    const requestNumber = ++costRequestNumber;
+    costElement.textContent = "Calculating...";
+
+    const form = new FormData();
+    form.append("shop_id", shopId);
+    form.append("total_pages", totalPages);
+    form.append("copies", copies);
+    form.append("paper_type", paperType);
+
+    try {
+        const response = await fetch("/calculate-print-cost", {
+            method: "POST",
+            body: form,
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const data = await response.json();
+
+        if (requestNumber !== costRequestNumber) return;
+
+        if (!response.ok || !data.success) {
+            costElement.textContent = "Price unavailable";
+            return;
+        }
+
+        costElement.textContent = `₹ ${Number(data.cost).toFixed(2)}`;
+    } catch (error) {
+        if (requestNumber === costRequestNumber) {
+            costElement.textContent = "Price unavailable";
+        }
+    }
+}
+
+
+/* =================================
+   AI PRINT PREVIEW
+================================= */
+async function previewPrint() {
+    const result = document.getElementById("ai-result");
+    const btn = document.getElementById("preview-order-btn");
+    const shopInput = document.getElementById("shop-id");
+    const copiesInput = document.getElementById("copies");
+
+    if (!shopInput?.value) {
+        showWarning("Please select a print shop first.", "Missing Shop");
+        return;
+    }
+    if (!selectedFiles.length) {
+        showWarning("Please upload at least one document first.", "Missing Document");
+        return;
+    }
+    if (!documentAnalysisCompleted || documentAnalyses.length !== selectedFiles.length || Number(latestAIAnalysis.total_pages) <= 0) {
+        showWarning("Please analyze the documents with Gemini before opening the print preview.", "Analysis Required");
+        return;
+    }
+
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "🤖 Preparing AI Preview...";
+    if (result) result.innerHTML = `<div class="ai-loading">🤖 Gemini is interpreting your print preferences and additional requirements...</div>`;
+
+    const form = new FormData();
+    selectedFiles.forEach(file => form.append("documents", file));
+    form.append("copies", copiesInput?.value || "1");
+    form.append("color", document.querySelector('input[name="color"]:checked')?.value || "black_white");
+    form.append("orientation", document.querySelector('input[name="orientation"]:checked')?.value || "portrait");
+    form.append("print_side", document.querySelector('input[name="side"]:checked')?.value || "single");
+    form.append("page_range", document.querySelector('input[name="pages"]:checked')?.value === "custom" ?
+        (document.getElementById("page-range-input")?.value || "all") : "all");
+    form.append("paper_type", document.querySelector('input[name="paper"]:checked')?.value || "printing");
+    form.append("additional_requirements", document.getElementById("additional-requirements")?.value || "");
+    form.append("analyses", JSON.stringify(documentAnalyses));
+
+    try {
+        const response = await fetch("/analyze-print-preview", { method: "POST", body: form, credentials: "same-origin" });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || "Could not prepare preview.");
+        latestPrintPreviewPlan = data.plan || {mode:"standard", copies_per_sheet:1, columns:1, rows:1, crop:"fit"};
+        renderPrintPreview(latestPrintPreviewPlan, data.engine || "local-fallback");
+        if (result) result.innerHTML = `<div class="ai-success">✅ AI print preview is ready. Review it before placing the order.</div>`;
+    } catch (error) {
+        if (result) result.innerHTML = `<div class="ai-error">❌ ${escapeHtml(error.message || "Preview could not be generated.")}</div>`;
+        showWarning(error.message || "Could not generate print preview.", "Preview Failed");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+}
+
+function cleanupPreviewUrls() {
+    previewObjectUrls.forEach(url => URL.revokeObjectURL(url));
+    previewObjectUrls = [];
+}
+
+function renderPrintPreview(plan, engine) {
+    cleanupPreviewUrls();
+    const modal = document.getElementById("printPreviewModal");
+    const summary = document.getElementById("preview-summary");
+    const analysis = document.getElementById("preview-analysis");
+    const sheets = document.getElementById("preview-sheets");
+    const engineEl = document.getElementById("preview-engine");
+    if (!modal || !summary || !analysis || !sheets) return;
+
+    const color = document.querySelector('input[name="color"]:checked')?.value || "black_white";
+    const orientation = document.querySelector('input[name="orientation"]:checked')?.value || "portrait";
+    const side = document.querySelector('input[name="side"]:checked')?.value || "single";
+    const paper = document.querySelector('input[name="paper"]:checked')?.value || "printing";
+    const copies = Number(document.getElementById("copies")?.value || 1);
+    const additional = document.getElementById("additional-requirements")?.value.trim() || "None";
+    const requested = Number(plan.copies_per_sheet || 1);
+    const grayscale = color === "black_white";
+
+    summary.textContent = plan.summary || "AI preview generated from your selected print preferences.";
+    analysis.innerHTML = `
+        <div class="preview-chip"><b>Copies:</b> ${copies}</div>
+        <div class="preview-chip"><b>Color:</b> ${escapeHtml(color.replace(/_/g, " "))}</div>
+        <div class="preview-chip"><b>Orientation:</b> ${escapeHtml(orientation)}</div>
+        <div class="preview-chip"><b>Side:</b> ${escapeHtml(side.replace(/_/g, " "))}</div>
+        <div class="preview-chip"><b>Paper:</b> ${escapeHtml(paper.replace(/_/g, " "))}</div>
+        <div class="preview-chip"><b>Pages:</b> ${escapeHtml(document.querySelector('input[name="pages"]:checked')?.value === "custom" ? (document.getElementById("page-range-input")?.value || "all") : "all")}</div>
+        <div class="preview-chip preview-chip-wide"><b>Additional:</b> ${escapeHtml(additional)}</div>`;
+
+    sheets.innerHTML = "";
+    selectedFiles.forEach((file, fileIndex) => {
+        const sheet = document.createElement("div");
+        sheet.className = "preview-sheet-wrap";
+        const title = document.createElement("div");
+        title.className = "preview-sheet-title";
+        title.innerHTML = `<strong>Print Preview ${fileIndex + 1}</strong><span>${escapeHtml(file.name)}</span>`;
+        sheet.appendChild(title);
+
+        const paperEl = document.createElement("div");
+        paperEl.className = `preview-paper ${orientation === "landscape" ? "landscape" : "portrait"} ${grayscale ? "preview-grayscale" : "preview-color"}`;
+
+        const url = URL.createObjectURL(file);
+        previewObjectUrls.push(url);
+        const isImage = /^image\//i.test(file.type);
+
+        if (plan.mode === "passport_grid" && isImage) {
+            const grid = document.createElement("div");
+            grid.className = "passport-preview-grid";
+            grid.style.gridTemplateColumns = `repeat(${Math.min(4, Math.max(1, Number(plan.columns || 2)))}, minmax(0, 1fr))`;
+            for (let i = 0; i < requested; i++) {
+                const cell = document.createElement("div");
+                cell.className = "passport-preview-cell";
+                const img = document.createElement("img");
+                img.src = url;
+                img.alt = `Passport photo ${i + 1}`;
+                cell.appendChild(img);
+                grid.appendChild(cell);
+            }
+            paperEl.appendChild(grid);
+        } else if (isImage) {
+            const grid = document.createElement("div");
+            grid.className = "standard-copy-grid";
+            grid.style.gridTemplateColumns = `repeat(${Math.min(4, Math.max(1, Number(plan.columns || 1)))}, minmax(0, 1fr))`;
+            for (let i = 0; i < requested; i++) {
+                const cell = document.createElement("div");
+                cell.className = "standard-copy-cell";
+                const img = document.createElement("img");
+                img.className = "standard-preview-image";
+                img.src = url;
+                img.alt = `Print preview copy ${i + 1} of ${file.name}`;
+                cell.appendChild(img);
+                grid.appendChild(cell);
+            }
+            paperEl.appendChild(grid);
+        } else if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+            const frame = document.createElement("iframe");
+            frame.className = `document-preview-frame ${grayscale ? "preview-grayscale" : ""}`;
+            frame.src = url;
+            frame.title = `PDF preview of ${file.name}`;
+            paperEl.appendChild(frame);
+        } else {
+            paperEl.innerHTML = `<div class="generic-preview"><div class="generic-preview-icon">📄</div><strong>${escapeHtml(file.name)}</strong><span>Print layout will use the selected paper, orientation, color and side settings.</span></div>`;
+        }
+        sheet.appendChild(paperEl);
+        sheets.appendChild(sheet);
+    });
+
+    const warnings = Array.isArray(plan.warnings) ? plan.warnings.filter(Boolean) : [];
+    if (warnings.length) {
+        const warning = document.createElement("div");
+        warning.className = "preview-warning";
+        warning.innerHTML = `<strong>Review before placing:</strong><ul>${warnings.map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul>`;
+        sheets.appendChild(warning);
+    }
+    engineEl.textContent = engine === "ai-assisted-fast-preview" ? "AI-assisted fast preview • document analysis reused" : (engine === "gemini" ? "AI interpretation: Gemini" : "AI interpretation: local fallback");
+    modal.style.display = "flex";
+    modal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("preview-open");
+}
+
+function closePrintPreview() {
+    const modal = document.getElementById("printPreviewModal");
+    if (!modal) return;
+    modal.style.display = "none";
+    modal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("preview-open");
+    cleanupPreviewUrls();
+}
+
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closePrintPreview();
+});
+
+
+/* =================================
+   PLACE ORDER
+================================= */
+function placeOrder() {
+    const fileInput = document.getElementById("document-file");
+    const shopInput = document.getElementById("shop-id");
+    const copiesInput = document.getElementById("copies");
+    const costElement = document.getElementById("estimated-cost");
+
+    if (!shopInput.value) {
+        showWarning("Please select a print shop.", "Missing Shop");
+        return;
+    }
+    if (!selectedFiles.length) {
+        showWarning("Please upload at least one document.", "Missing Document");
+        return;
+    }
+    if (!documentAnalysisCompleted || documentAnalyses.length !== selectedFiles.length || Number(latestAIAnalysis.total_pages) <= 0) {
+        showWarning("Document analysis is mandatory. Please click Analyze Document and wait for Gemini to determine the page count before placing the order.", "Analysis Required");
+        return;
+    }
+    if (!copiesInput.value || Number(copiesInput.value) < 1) {
+        showWarning("Please enter a valid number of copies.", "Invalid Copies");
+        return;
+    }
+
+    const form = new FormData();
+    selectedFiles.forEach(file => form.append("documents", file));
+    form.append("shop_id", shopInput.value);
+    form.append("copies", copiesInput.value);
+    form.append("color", document.querySelector('input[name="color"]:checked')?.value || "black_white");
+    form.append("orientation", document.querySelector('input[name="orientation"]:checked')?.value || "portrait");
+    form.append("print_side", document.querySelector('input[name="side"]:checked')?.value || "single");
+    form.append("page_range", document.querySelector('input[name="pages"]:checked')?.value === "custom" ?
+        (document.getElementById("page-range-input").value || "all") : "all");
+    form.append("paper_type", document.querySelector('input[name="paper"]:checked')?.value || "printing");
+    form.append("additional_requirements", document.getElementById("additional-requirements").value || "");
+    form.append("cost", (costElement.innerText || "₹ 0").replace(/[^0-9.]/g, "") || "0");
+    form.append("total_pages", latestAIAnalysis.total_pages);
+    form.append("blank_pages", latestAIAnalysis.blank_pages);
+    form.append("blurry_pages", latestAIAnalysis.blurry_pages);
+    form.append("unrecognizable_pages", latestAIAnalysis.unrecognizable_pages);
+    form.append("analyses", JSON.stringify(documentAnalyses));
+
+    const btn = document.querySelector(".order-btn");
+    btn.disabled = true;
+    btn.innerText = "Placing Order...";
+
+    fetch("/place-order", { method: "POST", body: form })
+        .then(r => r.json().then(j => ({ok:r.ok, data:j})))
+        .then(({ok, data}) => {
+            btn.disabled = false;
+            btn.innerText = "Place Print Order";
+            if (!ok || !data.success) {
+                showWarning(data.error || "Could not place order.", "Order Failed");
+                return;
+            }
+            window.qfpPendingPayment = data;
+            window.qfpSelectedPayment = data.online_payment_available ? "upi" : "cash";
+            document.getElementById("paymentOrderId").innerText = "#QFP" + String(data.order_id).padStart(6, "0");
+            document.getElementById("paymentShop").innerText = data.shop;
+            document.getElementById("paymentAmount").innerText = data.cost;
+            document.getElementById("paymentError").style.display = "none";
+            document.getElementById("upiPaymentChoice").style.display = data.online_payment_available ? "flex" : "none";
+            document.getElementById("qrPaymentChoice").style.display = data.online_payment_available ? "flex" : "none";
+            selectPaymentChoice(window.qfpSelectedPayment);
+            document.getElementById("dashboard").style.display = "none";
+            document.getElementById("orderSuccess").style.display = "none";
+            document.getElementById("paymentScreen").style.display = "flex";
+            window.scrollTo({top: 0, behavior: "smooth"});
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.innerText = "Place Print Order";
+            showWarning("Server connection failed while placing the order.", "Connection Failed");
+        });
+}
+
+
+/* =================================
+   PAYMENT METHOD + RAZORPAY PAYMENT
+================================= */
+function showPaymentError(message) {
+    const el = document.getElementById("paymentError");
+    el.textContent = message;
+    el.style.display = "block";
+}
+
+function stopQrPolling() {
+    if (window.qfpQrTimer) {
+        clearInterval(window.qfpQrTimer);
+        window.qfpQrTimer = null;
+    }
+    if (window.qfpUpiTimer) {
+        clearInterval(window.qfpUpiTimer);
+        window.qfpUpiTimer = null;
+    }
+}
+
+function selectPaymentChoice(method) {
+    stopQrPolling();
+    window.qfpSelectedPayment = method;
+    document.querySelectorAll(".payment-choice").forEach(el => el.classList.remove("selected"));
+    const map = { upi: "upiPaymentChoice", qr: "qrPaymentChoice", cash: "cashPaymentChoice" };
+    const selected = document.getElementById(map[method]);
+    if (selected) selected.classList.add("selected");
+    const qrPanel = document.getElementById("qrPaymentPanel");
+    if (qrPanel) qrPanel.style.display = method === "qr" ? "block" : "none";
+    const note = document.getElementById("paymentNote");
+    if (note) {
+        note.textContent = method === "upi"
+            ? "UPI is processed by Razorpay. Only UPI is allowed in QueueFree online checkout."
+            : method === "qr"
+                ? "Razorpay UPI QR is available in Live Mode. Test Mode supports UPI Checkout, not UPI Payment Links/QR."
+                : "Cash payment is collected at the selected print shop. The shop admin must mark cash as received.";
+    }
+    const btn = document.getElementById("payNowBtn");
+    if (btn) btn.textContent = method === "upi" ? "Pay with UPI" : method === "qr" ? "Generate Payment QR" : "Confirm Cash at Shop";
+    document.getElementById("paymentError").style.display = "none";
+}
+
+async function continueWithSelectedPayment() {
+    const data = window.qfpPendingPayment;
+    if (!data) { showPaymentError("Payment information is missing. Please place the order again."); return; }
+    const btn = document.getElementById("payNowBtn");
+    btn.disabled = true;
+    btn.textContent = "Processing...";
+    try {
+        if (window.qfpSelectedPayment === "cash") {
+            const response = await fetch("/payment/cash/" + data.order_id, {
+                method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}
+            });
+            const result = await response.json();
+            if (!response.ok || !result.success) throw new Error(result.error || "Could not select cash payment.");
+            showOrderSuccess("Cash at Shop — Pending");
+            return;
+        }
+
+        if (window.qfpSelectedPayment === "qr") {
+            await startQrPayment();
+            return;
+        }
+
+        const response = await fetch("/payment/start/" + data.order_id, {
+            method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || "Could not start UPI payment.");
+        data.payment = result.payment;
+        startRazorpayPayment();
+    } catch (error) {
+        btn.disabled = false;
+        selectPaymentChoice(window.qfpSelectedPayment);
+        showPaymentError(error.message || "Payment could not be started.");
+    }
+}
+
+function showOrderSuccess(paymentLabel) {
+    stopQrPolling();
+    const data = window.qfpPendingPayment;
+    document.getElementById("generatedOrderId").innerText = "#QFP" + String(data.order_id).padStart(6, "0");
+    document.getElementById("successShop").innerText = data.shop;
+    document.getElementById("successCost").innerText = data.cost;
+    document.getElementById("successCopies").innerText = data.copies;
+    const paymentDetail = document.getElementById("successPaymentMethod");
+    if (paymentDetail) paymentDetail.innerText = paymentLabel;
+    document.getElementById("paymentScreen").style.display = "none";
+    document.getElementById("orderSuccess").style.display = "flex";
+    window.scrollTo({top: 0, behavior: "smooth"});
+}
+
+async function startRazorpayPayment() {
+    const data = window.qfpPendingPayment;
+    const payButton = document.getElementById("payNowBtn");
+    if (!data) { showPaymentError("Payment information is missing. Please try again."); return; }
+    payButton.disabled = true;
+    payButton.textContent = "Opening UPI...";
+    try {
+        const response = await fetch("/payment/start/" + data.order_id, {
+            method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || "Could not start UPI payment.");
+
+        const payment = result.payment || {};
+        data.payment = payment;
+        if (!payment.order_id || !payment.key_id) throw new Error("Razorpay order information was not returned.");
+
+        const options = {
+            key: payment.key_id,
+            amount: payment.amount_paise,
+            currency: "INR",
+            name: "Queue-Free Print",
+            description: "Print Order #QFP" + String(data.order_id).padStart(6, "0"),
+            order_id: payment.order_id,
+            prefill: {
+                name: payment.name || "",
+                email: payment.email || "",
+                contact: payment.contact || ""
+            },
+            display: {
+                hide: [
+                    { method: "card" },
+                    { method: "netbanking" },
+                    { method: "wallet" }
+                ],
+                preferences: { show_default_blocks: true }
+            },
+            handler: async function (response) {
+                try {
+                    const verifyResponse = await fetch("/payment/verify", {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({
+                            order_id: data.order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_signature: response.razorpay_signature
+                        })
+                    });
+                    const verified = await verifyResponse.json();
+                    if (!verifyResponse.ok || !verified.success) throw new Error(verified.error || "Payment verification failed.");
+                    stopQrPolling();
+                    showOrderSuccess("UPI — Paid");
+                } catch (error) {
+                    payButton.disabled = false;
+                    payButton.textContent = "Pay with UPI";
+                    showPaymentError(error.message || "Payment verification failed.");
+                }
+            },
+            modal: {
+                ondismiss: function () {
+                    payButton.disabled = false;
+                    payButton.textContent = "Pay with UPI";
+                }
+            },
+            theme: { color: "#111827" }
+        };
+
+        // Test Mode UPI is entered inside Razorpay Checkout. Use success@razorpay
+        // there to simulate a successful payment. No cards/netbanking/wallets are shown.
+        const rzp = new Razorpay(options);
+        window.qfpRazorpay = rzp;
+        rzp.open();
+    } catch (error) {
+        payButton.disabled = false;
+        payButton.textContent = "Pay with UPI";
+        showPaymentError(error.message || "UPI payment could not be started.");
+    }
+}
+
+async function checkUpiPaymentStatus() {
+    const data = window.qfpPendingPayment;
+    if (!data) return;
+    try {
+        const response = await fetch("/payment/upi/status/" + data.order_id, { credentials: "same-origin" });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || "Could not check UPI payment status.");
+        if (result.status === "paid") {
+            if (window.qfpUpiTimer) { clearInterval(window.qfpUpiTimer); window.qfpUpiTimer = null; }
+            showOrderSuccess("UPI — Paid");
+            return;
+        }
+        const note = document.getElementById("paymentNote");
+        if (note) note.textContent = result.status === "expired" ? "UPI payment link expired. Please try again." : "Complete the UPI payment in the Razorpay window. QueueFree will verify it automatically.";
+    } catch (error) {
+        // Keep polling through transient network errors.
+    }
+}
+
+async function startQrPayment() {
+    const data = window.qfpPendingPayment;
+    const btn = document.getElementById("payNowBtn");
+    try {
+        const response = await fetch("/payment/qr/start/" + data.order_id, {
+            method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || "Could not generate the UPI QR.");
+        const panel = document.getElementById("qrPaymentPanel");
+        const image = document.getElementById("paymentQrImage");
+        const amount = document.getElementById("qrPaymentAmount");
+        const status = document.getElementById("qrPaymentStatus");
+        image.src = result.qr.image_url;
+        amount.textContent = result.qr.amount;
+        status.textContent = "Waiting for payment";
+        panel.style.display = "block";
+        btn.disabled = true;
+        btn.textContent = "Waiting for UPI Payment...";
+        stopQrPolling();
+        window.qfpQrTimer = setInterval(checkQrPaymentStatus, 3000);
+        await checkQrPaymentStatus();
+    } catch (error) {
+        btn.disabled = false;
+        btn.textContent = "Generate Payment QR";
+        showPaymentError(error.message || "Could not generate the UPI QR.");
+    }
+}
+
+async function checkQrPaymentStatus() {
+    const data = window.qfpPendingPayment;
+    if (!data) return;
+    try {
+        const response = await fetch("/payment/qr/status/" + data.order_id, { credentials: "same-origin" });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || "Could not check payment status.");
+        if (result.status === "paid") {
+            stopQrPolling();
+            showOrderSuccess("UPI QR — Paid");
+            return;
+        }
+        const status = document.getElementById("qrPaymentStatus");
+        if (status) status.textContent = result.status === "expired" || result.status === "cancelled" ? "QR expired — generate a new one" : "Waiting for payment";
+    } catch (error) {
+        const hint = document.getElementById("qrPaymentHint");
+        if (hint) hint.textContent = error.message || "Checking payment status...";
+    }
+}
+
+function cancelPendingPayment() {
+    stopQrPolling();
+    showWarning("Your print order will remain pending until you select a payment method. Continue?", "Leave Payment", "?", () => {
+        fetch("/payment/abandon/" + (window.qfpPendingPayment?.order_id || ""), {method: "POST", credentials: "same-origin"})
+            .finally(() => { closeWarning(); window.location.href = "{{ url_for('recent_orders') }}"; });
+    });
+}
+
+
+/* =================================
+   BACK TO DASHBOARD
+================================= */
+
+/* =================================
+   LIVE PROFILE NAME SYNC
+================================= */
+
+function applyUpdatedProfileName(profile) {
+    if (!profile || !profile.name) return;
+    const nameElement = document.getElementById("studentWelcomeName");
+    if (nameElement) nameElement.textContent = profile.name;
+}
+
+window.addEventListener("storage", function(event) {
+    if (event.key !== "qfp_profile_updated" || !event.newValue) return;
+    try {
+        applyUpdatedProfileName(JSON.parse(event.newValue));
+    } catch (e) {}
+});
+
+try {
+    if (window.BroadcastChannel) {
+        const profileChannel = new BroadcastChannel("qfp_profile_channel");
+        profileChannel.onmessage = function(event) {
+            applyUpdatedProfileName(event.data);
+        };
+    }
+} catch (e) {}
+
+
+function backToDashboard() {
+
+
+    /* Hide success screen */
+
+    document.getElementById(
+        "orderSuccess"
+    ).style.display = "none";
+
+
+    /* Show dashboard */
+
+    document.getElementById(
+        "dashboard"
+    ).style.display = "block";
+
+
+    /* Scroll to new order */
+
+    document.getElementById(
+        "new-order"
+    ).scrollIntoView({
+
+        behavior: "smooth"
+
+    });
+
+
+}
+
+
+
+/* =================================
+   LOGOUT CONFIRMATION
+================================= */
+
+function confirmLogout(event) {
+
+
+    event.preventDefault();
+
+
+    document.getElementById(
+        "logoutPopup"
+    ).style.display = "flex";
+
+
+}
+
+
+
+function closeLogoutPopup() {
+
+
+    document.getElementById(
+        "logoutPopup"
+    ).style.display = "none";
+
+
+}
+
+
+
+function logoutUser() {
+
+
+    window.location.href = "{{ url_for('logout') }}";
+
+
+}
+
+
+</script>
+
+
+
+<script>
+// Refresh-safe payment recovery: the server provides the pending order from
+// the database/session, so browser memory is not required to restore this page.
+window.qfpResumePayment = {{ (resume_payment or {}) | tojson }};
+
+function restorePendingPaymentScreen() {
+    const data = window.qfpResumePayment;
+    if (!data || !data.order_id) return;
+
+    window.qfpPendingPayment = data;
+    const savedMethod = data.payment_method && data.payment_method !== "unselected"
+        ? data.payment_method
+        : (data.online_payment_available ? "upi" : "cash");
+    window.qfpSelectedPayment = savedMethod === "upi_qr" ? "qr" : savedMethod;
+
+    const orderEl = document.getElementById("paymentOrderId");
+    const shopEl = document.getElementById("paymentShop");
+    const amountEl = document.getElementById("paymentAmount");
+    if (orderEl) orderEl.innerText = "#QFP" + String(data.order_id).padStart(6, "0");
+    if (shopEl) shopEl.innerText = data.shop || "";
+    if (amountEl) amountEl.innerText = data.cost || "₹ 0.00";
+
+    const online = data.online_payment_available !== false;
+    const upiChoice = document.getElementById("upiPaymentChoice");
+    const qrChoice = document.getElementById("qrPaymentChoice");
+    if (upiChoice) upiChoice.style.display = online ? "flex" : "none";
+    if (qrChoice) qrChoice.style.display = online ? "flex" : "none";
+    if (typeof selectPaymentChoice === "function") selectPaymentChoice(window.qfpSelectedPayment);
+
+    document.getElementById("dashboard").style.display = "none";
+    document.getElementById("orderSuccess").style.display = "none";
+    document.getElementById("paymentScreen").style.display = "flex";
+
+    // If a QR was already generated, show it immediately and resume polling.
+    if (savedMethod === "upi_qr" && data.qr_image_url) {
+        const panel = document.getElementById("qrPaymentPanel");
+        const image = document.getElementById("paymentQrImage");
+        const status = document.getElementById("qrPaymentStatus");
+        if (image) image.src = data.qr_image_url;
+        if (status) status.textContent = "Waiting for payment";
+        if (panel) panel.style.display = "block";
+        const btn = document.getElementById("payNowBtn");
+        if (btn) { btn.disabled = true; btn.textContent = "Waiting for UPI Payment..."; }
+        if (typeof stopQrPolling === "function") stopQrPolling();
+        window.qfpQrTimer = setInterval(checkQrPaymentStatus, 3000);
+        checkQrPaymentStatus();
+    }
+}
+
+window.addEventListener("DOMContentLoaded", restorePendingPaymentScreen);
+</script>
+
+
+<script>
+(function setupStateFilterDropdown() {
+    const dropdown = document.getElementById('state-filter-dropdown');
+    const toggle = document.getElementById('shop-state-toggle');
+    const menu = document.getElementById('shop-state-menu');
+    const search = document.getElementById('shop-state-search');
+    const stateInput = document.getElementById('shop-state');
+    const label = document.getElementById('shop-state-label');
+    const empty = document.getElementById('shop-state-empty');
+    if (!dropdown || !toggle || !menu || !search || !stateInput || !label) return;
+
+    function closeMenu() {
+        menu.classList.remove('open');
+        toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    function openMenu() {
+        menu.classList.add('open');
+        toggle.setAttribute('aria-expanded', 'true');
+        setTimeout(() => search.focus(), 0);
+    }
+
+    function renderOptions() {
+        const query = search.value.trim().toLowerCase();
+        const options = menu.querySelectorAll('.state-filter-option');
+        let visible = 0;
+        options.forEach(option => {
+            const value = (option.dataset.value || '').toLowerCase();
+            const show = !query || value.includes(query);
+            option.hidden = !show;
+            if (show) visible++;
+        });
+        if (empty) empty.hidden = visible !== 0;
+    }
+
+    toggle.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (menu.classList.contains('open')) closeMenu();
+        else openMenu();
+    });
+
+    search.addEventListener('input', renderOptions);
+    search.addEventListener('click', event => event.stopPropagation());
+
+    menu.addEventListener('click', event => {
+        const option = event.target.closest('.state-filter-option');
+        if (!option) return;
+        const value = option.dataset.value || '';
+        stateInput.value = value;
+        label.textContent = value || 'All states';
+        menu.querySelectorAll('.state-filter-option').forEach(item => item.classList.remove('active'));
+        option.classList.add('active');
+        search.value = '';
+        renderOptions();
+        closeMenu();
+        if (typeof filterShopUniversities === 'function') filterShopUniversities();
+    });
+
+    document.addEventListener('click', event => {
+        if (!dropdown.contains(event.target)) closeMenu();
+    });
+
+    renderOptions();
+})();
+
+function getShopFilterValues() {
+    return {
+        state: document.getElementById('shop-state')?.value.trim() || '',
+        university: document.getElementById('shop-university')?.value.trim() || ''
+    };
+}
+
+function refreshShopFilterOptions() {
+    const state = document.getElementById('shop-state')?.value.trim() || '';
+    const universityList = document.getElementById('shop-university-options');
+    const shop = document.getElementById('shop-id');
+    if (!universityList || !shop) return;
+
+    const currentUniversity = document.getElementById('shop-university')?.value.trim() || '';
+    const seen = new Set();
+    universityList.innerHTML = '';
+
+    [...shop.options].forEach(opt => {
+        if (!opt.value) return;
+        const optState = (opt.dataset.state || '').trim();
+        const optUniversity = (opt.dataset.university || '').trim();
+        if ((!state || optState === state) && optUniversity && !seen.has(optUniversity)) {
+            seen.add(optUniversity);
+            const option = document.createElement('option');
+            option.value = optUniversity;
+            universityList.appendChild(option);
+        }
+    });
+
+    // If the selected university no longer belongs to the selected state, clear it.
+    if (currentUniversity && state) {
+        const stillValid = [...shop.options].some(opt =>
+            opt.value && (opt.dataset.state || '').trim() === state &&
+            (opt.dataset.university || '').trim() === currentUniversity
+        );
+        if (!stillValid) document.getElementById('shop-university').value = '';
+    }
+}
+
+function filterShopUniversities() {
+    refreshShopFilterOptions();
+    filterShops();
+}
+
+function filterShops() {
+    const { state, university } = getShopFilterValues();
+    const shop = document.getElementById('shop-id');
+    if (!shop) return;
+
+    const currentShop = shop.value;
+    let currentStillMatches = false;
+
+    [...shop.options].forEach(opt => {
+        if (!opt.value) return;
+        const optState = (opt.dataset.state || '').trim();
+        const optUniversity = (opt.dataset.university || '').trim();
+        const match = (!state || optState === state) &&
+                      (!university || optUniversity === university);
+        opt.hidden = !match;
+        if (opt.value === currentShop && match) currentStillMatches = true;
+    });
+
+    // Keep the currently selected shop if it still matches the filters.
+    if (!currentStillMatches && currentShop) {
+        shop.value = '';
+        updateEstimatedCost();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const shop = document.getElementById('shop-id');
+    if (!shop) return;
+    [...shop.options].forEach(opt => { opt.hidden = false; });
+    refreshShopFilterOptions();
+});
+</script>
+
+
+<!-- ================= AI GOVERNMENT ASSISTANT WIDGET ================= -->
+<div id="qfpGovtWidget" class="qfp-govt-widget" aria-hidden="true">
+  <div class="qfp-govt-window">
+    <div class="qfp-govt-header">
+      <div><strong>🤖 AI Government Assistant</strong><span>Government document & service guidance</span></div>
+      <button type="button" class="qfp-govt-close" onclick="qfpCloseGovernmentAssistant()" aria-label="Close">×</button>
+    </div>
+    <div class="qfp-govt-body">
+      <aside class="qfp-govt-chats">
+        <div class="qfp-govt-chats-top"><strong>Recent Chats</strong><button type="button" onclick="qfpNewGovernmentChat()">＋ New</button></div>
+        <div id="qfpGovtChatList" class="qfp-govt-chat-list"><div class="qfp-govt-muted">Loading chats…</div></div>
+      </aside>
+      <section class="qfp-govt-conversation">
+        <div id="qfpGovtMessages" class="qfp-govt-messages"></div>
+        <div class="qfp-govt-compose"><textarea id="qfpGovtInput" maxlength="2000" rows="2" placeholder="Ask about a government document or service…"></textarea><button type="button" id="qfpGovtSend" onclick="qfpSendGovernmentMessage()">Send</button></div>
+        <div class="qfp-govt-official"><span>Official starting points:</span> <a href="https://services.india.gov.in/" target="_blank" rel="noopener">Government Services</a> · <a href="https://www.india.gov.in/" target="_blank" rel="noopener">India.gov.in</a> · <a href="https://www.digilocker.gov.in/" target="_blank" rel="noopener">DigiLocker</a></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+</body>
+
+</html>

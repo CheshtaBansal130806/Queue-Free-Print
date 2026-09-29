@@ -1,0 +1,1623 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Recent Orders | Queue-Free Print</title>
+
+    <link rel="stylesheet" href="../static/recentstudentorder.css">
+
+
+<script>
+/* Prevent browser back/BFCache from reopening a protected page after logout. */
+window.addEventListener("pageshow", async function (event) {
+    if (!event.persisted) return;
+
+    try {
+        const response = await fetch("{{ url_for('session_status') }}", {
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const data = await response.json();
+
+        if (!data.logged_in) {
+            window.location.replace("{{ url_for('home') }}");
+        }
+    } catch (e) {
+        window.location.replace("{{ url_for('home') }}");
+    }
+});
+</script>
+
+
+<script>
+/* Re-check authentication whenever this protected page is shown, including browser Back/BFCache. */
+(function () {
+    const homeUrl = "{{ url_for('home') }}";
+    const statusUrl = "{{ url_for('session_status') }}";
+
+    async function verifySession() {
+        try {
+            const response = await fetch(statusUrl, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache" }
+            });
+            const data = await response.json();
+
+            if (!data.logged_in) {
+                window.location.replace(homeUrl);
+            }
+        } catch (error) {
+            window.location.replace(homeUrl);
+        }
+    }
+
+    window.addEventListener("pageshow", verifySession);
+})();
+</script>
+    <script src="{{ url_for('static', filename='notifications.js') }}" defer></script>
+<script src="https://unpkg.com/html5-qrcode" defer></script>
+    <link rel="stylesheet" href="../static/responsive.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='nearby_shops.css') }}">
+    <script src="{{ url_for('static', filename='nearby_shops.js') }}" defer></script>
+</head>
+
+
+<body data-user-role="user">
+
+
+<!-- ==================================================
+     NAVBAR
+================================================== -->
+
+<nav>
+    <div class="logo">Queue-Free <span>Print</span></div>
+    <div class="nav-links">
+        <a href="{{ url_for('user_dashboard') }}#dashboard">Dashboard</a>
+        <a href="{{ url_for('delivery_scan') }}">Scan QR</a>
+        <a href="{{ url_for('recent_orders') }}" class="active">Recent Orders</a>
+        <a class="notification-link" href="#" onclick="qfpOpenNotifications(event)">Notifications <span class="notification-badge" id="notificationBadge" hidden>0</span></a>
+        <a href="{{ url_for('profile') }}">Profile</a>
+        <a href="#" onclick="confirmLogout(event)">Logout</a>
+    </div>
+</nav>
+
+
+
+<!-- ==================================================
+     MAIN PAGE
+================================================== -->
+
+<main class="orders-page">
+
+    <section class="orders-header">
+        <h1>Recent Orders</h1>
+        <p>
+            View your recent printing orders, track placed
+            orders, and reorder completed documents.
+        </p>
+        <button type="button" class="qfp-nearby-btn" id="qfpNearbyBtn" onclick="qfpOpenNearbyShops()">📍 Locate Nearby Shops</button>
+        <button type="button" class="qr-scan-page-btn" onclick="openQRScanner(event)">
+            Scan QR for Delivery
+        </button>
+    </section>
+
+    <section class="filter-section">
+        <div class="filter-title">
+            <div>
+                <h3>🔎 Filter Orders</h3>
+                <p>Search orders by date and time.</p>
+            </div>
+
+            <button type="button" class="clear-btn" onclick="clearFilters()">
+                Clear Filters
+            </button>
+        </div>
+
+        <div class="filter-options">
+            <div class="filter-field">
+                <label>Date</label>
+                <input type="date" id="filterDate">
+            </div>
+
+            <div class="filter-field">
+                <label>From Time</label>
+                <input type="time" id="filterFromTime">
+            </div>
+
+            <div class="filter-field">
+                <label>To Time</label>
+                <input type="time" id="filterToTime">
+            </div>
+
+            <div class="filter-button">
+                <button type="button" onclick="applyFilters()">
+                    Apply Filter
+                </button>
+            </div>
+        </div>
+
+        <div id="filterResult"></div>
+    </section>
+
+    {% set placed_statuses = ['pending', 'accepted', 'printing', 'ready'] %}
+    {% set completed_statuses = ['completed', 'delivered'] %}
+
+    <section class="order-history-section" id="placedSection">
+        <div class="history-title">
+            <div>
+                <h2>Order Placed</h2>
+                <p>
+                    Orders that have been placed and are currently
+                    being processed by the shop.
+                </p>
+            </div>
+        </div>
+
+        <div class="orders-container" id="placedOrdersContainer">
+            {% for order in orders if order.order_status in placed_statuses %}
+            <div class="order-card placed-order"
+                 data-status="placed"
+                 data-date="{{ order.created_at.strftime('%Y-%m-%d') if order.created_at else '' }}"
+                 data-time="{{ order.created_at.strftime('%H:%M') if order.created_at else '' }}"
+                 data-order-id="{{ order.order_id }}"
+                 data-document="{{ order.document|e }}"
+                 data-copies="{{ order.copies }}"
+                 data-color="{{ order.color|e }}"
+                 data-orientation="{{ order.orientation|e }}"
+                 data-print-side="{{ order.print_side|e }}"
+                 data-page-range="{{ (order.page_range or 'all')|e }}"
+                 data-paper-type="{{ (order.paper_type or 'Printing')|e }}"
+                 data-additional="{{ (order.additional_requirements or '')|e }}"
+                 data-cost="{{ '%.2f'|format(order.estimated_cost or 0) }}"
+                 data-shop="{{ (order.shop_number or order.shop_name or 'N/A')|e }}"
+                 data-total-pages="{{ order.total_pages or 0 }}"
+                 data-blank-pages="{{ order.blank_pages or 0 }}"
+                 data-blurry-pages="{{ order.blurry_pages or 0 }}"
+                 data-unrecognizable-pages="{{ order.unrecognizable_pages or 0 }}"
+                 data-payment-method="{{ (order.payment_method or 'unselected')|e }}"
+                 data-payment-status="{{ (order.payment_status or 'pending')|e }}">
+
+                <div class="order-top">
+                    <div>
+                        <h2>#ORD{{ '%03d'|format(order.order_id) }}</h2>
+                        <p>
+                            {{ order.created_at.strftime('%d %B %Y • %I:%M %p') if order.created_at else 'Date unavailable' }}
+                        </p>
+                    </div>
+
+                    <span class="status placed">
+                        {% if order.order_status == 'ready' %}
+                            🖨️ Order Ready
+                        {% elif order.order_status == 'printing' %}
+                            🖨️ Printing
+                        {% elif order.order_status == 'accepted' %}
+                            ✓ Order Accepted
+                        {% else %}
+                            ⏳ Order Placed
+                        {% endif %}
+                    </span>
+                </div>
+
+                <div class="order-details">
+                    <div class="detail">
+                        <span>Document</span>
+                        <strong>{{ order.document }}</strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Copies</span>
+                        <strong>{{ order.copies }}</strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Color</span>
+                        <strong>
+                            {{ 'Color' if order.color == 'color' else 'Black & White' }}
+                        </strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Pages</span>
+                        <strong>{{ order.page_range or 'All Pages' }}</strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Paper</span>
+                        <strong>{{ order.paper_type or 'Printing' }}</strong>
+                    </div>
+
+                    <div class="detail payment-detail">
+                        <span>Payment</span>
+                        <strong>
+                            {% if order.payment_method == 'cash' %}
+                                Cash{% if order.payment_status == 'paid' %} • Paid{% else %} • Pay at Shop{% endif %}
+                            {% elif order.payment_status == 'paid' %}
+                                {{ 'UPI QR' if order.payment_method == 'upi_qr' else (order.payment_method or 'Online')|replace('_', ' ')|title }} • Paid
+                            {% else %}
+                                Payment Pending
+                            {% endif %}
+                        </strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Cost</span>
+                        <strong>₹{{ '%.2f'|format(order.estimated_cost or 0) }}</strong>
+                    </div>
+                </div>
+
+                <div class="wait-time-panel" id="waitTime-{{ order.order_id }}" data-order-id="{{ order.order_id }}">
+                    <div class="wait-time-main">
+                        <span class="wait-time-icon">⏱</span>
+                        <div>
+                            <strong class="wait-time-text">Calculating waiting time...</strong>
+                            <small class="wait-time-meta">Live queue prediction</small>
+                        </div>
+                    </div>
+                    <div class="wait-time-queue">Queue #<span class="wait-position">—</span></div>
+                </div>
+
+                <div class="order-bottom">
+                    <span>
+                        Shop: {{ order.shop_number or order.shop_name or 'N/A' }}
+                    </span>
+
+                    <div class="order-actions">
+                        {% if order.order_status == 'pending' %}
+                        <button class="edit-order-btn"
+                                onclick="openEditOrder({{ order.order_id }})">
+                            ✎ Edit Order
+                        </button>
+                        {% endif %}
+
+                        <button class="cancel-order-btn"
+                                onclick="cancelOrder({{ order.order_id }})">
+                            ✕ Cancel Order
+                        </button>
+
+                        <button class="details-btn"
+                                onclick="showDetails({{ order.order_id }})">
+                            View Details
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="order-history-section" id="completedSection">
+        <div class="history-title">
+            <div>
+                <h2>Completed</h2>
+                <p>
+                    Your completed printing orders. You can reorder
+                    a completed document anytime.
+                </p>
+            </div>
+        </div>
+
+        <div class="orders-container" id="completedOrdersContainer">
+            {% for order in orders if order.order_status in completed_statuses %}
+            <div class="order-card completed-order"
+                 data-status="completed"
+                 data-date="{{ order.created_at.strftime('%Y-%m-%d') if order.created_at else '' }}"
+                 data-time="{{ order.created_at.strftime('%H:%M') if order.created_at else '' }}"
+                 data-order-id="{{ order.order_id }}"
+                 data-document="{{ order.document|e }}"
+                 data-copies="{{ order.copies }}"
+                 data-color="{{ order.color|e }}"
+                 data-orientation="{{ order.orientation|e }}"
+                 data-print-side="{{ order.print_side|e }}"
+                 data-page-range="{{ (order.page_range or 'all')|e }}"
+                 data-paper-type="{{ (order.paper_type or 'Printing')|e }}"
+                 data-additional="{{ (order.additional_requirements or '')|e }}"
+                 data-cost="{{ '%.2f'|format(order.estimated_cost or 0) }}"
+                 data-shop="{{ (order.shop_number or order.shop_name or 'N/A')|e }}"
+                 data-total-pages="{{ order.total_pages or 0 }}"
+                 data-blank-pages="{{ order.blank_pages or 0 }}"
+                 data-blurry-pages="{{ order.blurry_pages or 0 }}"
+                 data-unrecognizable-pages="{{ order.unrecognizable_pages or 0 }}">
+
+                <div class="order-top">
+                    <div>
+                        <h2>#ORD{{ '%03d'|format(order.order_id) }}</h2>
+                        <p>
+                            {{ order.created_at.strftime('%d %B %Y • %I:%M %p') if order.created_at else 'Date unavailable' }}
+                        </p>
+                    </div>
+
+                    <span class="status completed">
+                        ✓ Completed
+                    </span>
+                </div>
+
+                <div class="order-details">
+                    <div class="detail">
+                        <span>Document</span>
+                        <strong>{{ order.document }}</strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Copies</span>
+                        <strong>{{ order.copies }}</strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Color</span>
+                        <strong>
+                            {{ 'Color' if order.color == 'color' else 'Black & White' }}
+                        </strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Pages</span>
+                        <strong>{{ order.page_range or 'All Pages' }}</strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Paper</span>
+                        <strong>{{ order.paper_type or 'Printing' }}</strong>
+                    </div>
+
+                    <div class="detail">
+                        <span>Cost</span>
+                        <strong>₹{{ '%.2f'|format(order.estimated_cost or 0) }}</strong>
+                    </div>
+                </div>
+
+                <div class="order-bottom">
+                    <span>
+                        Shop: {{ order.shop_number or order.shop_name or 'N/A' }}
+                    </span>
+
+                    <div class="order-actions">
+                        <button class="details-btn"
+                                onclick="showDetails({{ order.order_id }})">
+                            View Details
+                        </button>
+
+                        {% if order.order_status in ['completed', 'delivered'] %}
+                        <button class="receipt-btn"
+                                onclick="openDigitalReceipt({{ order.order_id }})">
+                            Digital Receipt
+                        </button>
+                        {% endif %}
+
+                        {% if order.order_status in ['completed', 'delivered'] and order.reorder_available %}
+                        <button class="details-btn"
+                                onclick="reorder({{ order.order_id }})">
+                            ↻ Reorder
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="no-orders" id="noOrders" style="display: none;">
+        <div>📄</div>
+        <h2>No Orders Found</h2>
+        <p>You don't have any orders matching the selected filter.</p>
+    </div>
+
+    <div class="pagination">
+        <button id="previousBtn" onclick="previousPage()">← Previous</button>
+        <span id="pageNumber">Page 1</span>
+        <button id="nextBtn" onclick="nextPage()">Next →</button>
+    </div>
+
+</main>
+
+
+
+<!-- ==================================================
+     NOTIFICATION POPUP
+================================================== -->
+
+<div
+    class="notification-overlay"
+    id="notificationPopup">
+
+
+    <div class="notification-box">
+
+
+        <div class="notification-header">
+
+            <div>
+
+                <h2>
+                    🔔 Notifications
+                </h2>
+
+                <p>
+                    Your latest updates and order notifications
+                </p>
+
+            </div>
+
+
+            <button
+                class="notification-close"
+                onclick="closeNotifications()">
+
+                ✕
+
+            </button>
+
+        </div>
+
+
+
+        <!-- NOTIFICATION LIST -->
+
+        <div class="notification-list" id="notificationList"></div>
+
+        <!-- NO NOTIFICATION -->
+
+        <div
+            class="no-notification"
+            id="noNotification"
+            style="display: none;">
+
+            <div class="no-notification-emoji">
+                🔕
+            </div>
+
+            <h3>
+                No Notifications
+            </h3>
+
+            <p>
+                You don't have any notifications yet.
+            </p>
+
+        </div>
+
+
+    </div>
+
+</div>
+
+
+
+<!-- ==================================================
+     ORDER DETAILS POPUP
+================================================== -->
+
+<div
+    class="details-overlay"
+    id="detailsPopup">
+
+
+    <div class="details-box">
+
+
+        <div class="details-header">
+
+            <h2>
+                Order Details
+            </h2>
+
+
+            <button
+                onclick="closeDetails()">
+
+                ✕
+
+            </button>
+
+        </div>
+
+
+        <div
+            class="details-content"
+            id="detailsContent">
+
+        </div>
+
+
+    </div>
+
+</div>
+
+
+
+<!-- ==================================================
+     DIGITAL RECEIPT POPUP
+================================================== -->
+<div class="receipt-overlay" id="digitalReceiptPopup" aria-hidden="true">
+    <div class="receipt-modal">
+        <div class="receipt-modal-header">
+            <div>
+                <span class="receipt-eyebrow">QUEUEFREE PRINT</span>
+                <h2>Digital Receipt</h2>
+            </div>
+            <button type="button" class="receipt-close" onclick="closeDigitalReceipt()">×</button>
+        </div>
+
+        <div class="receipt-preview" id="digitalReceiptContent">
+            <div class="receipt-loading">Loading receipt...</div>
+        </div>
+
+        <div class="receipt-modal-actions">
+            <button type="button" class="receipt-secondary-btn" onclick="closeDigitalReceipt()">Close</button>
+            <a id="downloadReceiptBtn" class="receipt-download-btn" href="#" download>
+                Download PDF
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ==================================================
+     EDIT ORDER POPUP
+================================================== -->
+<div class="qfp-edit-overlay" id="editOrderPopup">
+  <div class="qfp-edit-box">
+    <div class="qfp-edit-head"><div><span class="qfp-edit-eyebrow">EDIT PENDING ORDER</span><h2>Edit Order <span id="editOrderIdLabel"></span></h2><p>Modify this order without changing its queue position.</p></div><button type="button" onclick="closeEditOrder()">×</button></div>
+    <div id="editOrderError" class="qfp-edit-error" style="display:none"></div>
+    <div class="qfp-edit-docs"><div class="qfp-edit-section-title">Documents</div><div id="editExistingDocs"></div><label class="qfp-add-doc"><span>＋ Add Document</span><input id="editNewDocuments" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp,.bmp,.gif,.tif,.tiff"></label><div id="editNewDocsList"></div></div>
+    <div class="qfp-edit-grid">
+      <label>Copies<input id="editCopies" type="number" min="1" value="1"></label>
+      <label>Color<select id="editColor"><option value="black_white">Black & White</option><option value="color">Color</option></select></label>
+      <label>Orientation<select id="editOrientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
+      <label>Print Side<select id="editPrintSide"><option value="single">Single-Sided</option><option value="double">Double-Sided</option></select></label>
+      <label>Page Range<input id="editPageRange" type="text" value="all"></label>
+      <label>Paper Type<select id="editPaperType"><option value="printing">Printing</option><option value="photo">Photo</option><option value="sticker">Sticker</option></select></label>
+    </div>
+    <label class="qfp-edit-additional">Additional Requirement<textarea id="editAdditional" placeholder="Enter any special instructions..."></textarea></label>
+    <div class="qfp-ai-box"><div><strong>AI Document Analysis</strong><p id="editAiStatus">Analyze newly added documents before saving. Existing documents retain their saved analysis.</p></div><button type="button" id="editAnalyzeBtn" onclick="analyzeEditDocuments()">🔍 Fast AI Analysis</button></div>
+    <div class="qfp-edit-cost"><span>New Total</span><strong id="editNewTotal">₹0.00</strong><small id="editResidualText">Residual payment will be calculated on Save Changes.</small></div>
+    <div class="qfp-edit-actions"><button type="button" class="qfp-edit-cancel" onclick="closeEditOrder()">Cancel</button><button type="button" class="qfp-edit-save" id="saveEditBtn" onclick="saveEditedOrder()">Save Changes</button></div>
+  </div>
+</div>
+
+<!-- EDIT PAYMENT POPUP -->
+<div class="qfp-edit-overlay" id="editPaymentPopup">
+ <div class="qfp-payment-box">
+  <div class="qfp-edit-head"><div><span class="qfp-edit-eyebrow">REMAINING PAYMENT</span><h2>Complete Payment</h2><p>Only the additional amount is payable.</p></div><button type="button" onclick="closeEditPayment()">×</button></div>
+  <div class="qfp-payment-summary"><span>Order ID <b id="editPaymentOrderId"></b></span><span>Remaining Amount <b id="editPaymentAmount">₹0.00</b></span></div>
+  <div class="qfp-payment-methods"><button id="editPayUpi" onclick="selectEditPayment('upi')">UPI<small>Razorpay UPI</small></button><button id="editPayQr" onclick="selectEditPayment('qr')">▦ QR<small>Scan with UPI app</small></button><button id="editPayCash" onclick="selectEditPayment('cash')">₹ Cash<small>Pay at shop</small></button></div>
+  <div id="editQrPanel" class="qfp-qr-pay" style="display:none"><span id="editQrStatus">Waiting for payment</span><img id="editQrImage" src="" alt="UPI QR"><b id="editQrAmount">₹0.00</b></div>
+  <div id="editPaymentError" class="qfp-edit-error" style="display:none"></div>
+  <button id="editPayContinue" class="qfp-pay-continue" onclick="continueEditPayment()">Continue</button>
+ </div>
+</div>
+
+<!-- ==================================================
+     GENERAL WARNING POPUP
+================================================== -->
+<div class="warning-overlay" id="warningOverlay">
+    <div class="warning-box">
+        <div class="warning-icon" id="warningIcon">!</div>
+        <h2 id="warningTitle">Notice</h2>
+        <p id="warningMessage"></p>
+        <div class="warning-buttons">
+            <button type="button" class="warning-cancel-btn" id="warningCancelBtn" onclick="closeWarning()" style="display:none;">Cancel</button>
+            <button type="button" class="warning-ok-btn" id="warningOkBtn" onclick="warningPrimaryAction()">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================================================
+     LOGOUT CONFIRMATION POPUP
+================================================== -->
+
+<!-- ==================================================
+     CANCEL ORDER CONFIRMATION POPUP
+================================================== -->
+
+<div
+    class="cancel-order-overlay"
+    id="cancelOrderPopup">
+
+    <div class="cancel-order-box">
+
+        <div class="cancel-order-icon">
+            !
+        </div>
+
+        <h2>
+            Cancel Order?
+        </h2>
+
+        <p id="cancelOrderMessage">
+            Are you sure you want to cancel this order?
+        </p>
+
+        <div class="cancel-order-buttons">
+
+            <button
+                type="button"
+                class="cancel-order-no"
+                onclick="closeCancelOrderPopup()">
+                No, Keep Order
+            </button>
+
+            <button
+                type="button"
+                class="cancel-order-yes"
+                onclick="confirmCancelOrder()">
+                Yes, Cancel
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<div
+    class="logout-overlay"
+    id="logoutPopup">
+
+    <div class="logout-box">
+
+        <div class="logout-icon">
+            ?
+        </div>
+
+        <h2>
+            Logout Confirmation
+        </h2>
+
+        <p>
+            Are you sure you want to logout?
+        </p>
+
+        <div class="logout-buttons">
+
+            <button
+                type="button"
+                class="cancel-logout-btn"
+                onclick="closeLogoutPopup()">
+
+                Cancel
+
+            </button>
+
+            <button
+                type="button"
+                class="confirm-logout-btn"
+                onclick="logoutUser()">
+
+                Logout
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- ==================================================
+     FOOTER
+================================================== -->
+
+<footer>
+
+
+    <div class="footer-content">
+
+
+        <div class="footer-column">
+
+            <h3>
+                Queue-Free Print
+            </h3>
+
+            <p>
+                Simple and convenient online printing
+                system for college students.
+            </p>
+
+        </div>
+
+
+
+        <div class="footer-column">
+
+            <h3>
+                Quick Links
+            </h3>
+
+            <a href="{{ url_for('user_dashboard') }}">
+                Dashboard
+            </a>
+
+            <a href="#" onclick="openQRScanner(event)">
+            Scan QR
+        </a>
+
+        <a href="{{ url_for('recent_orders') }}">
+                Recent Orders
+            </a>
+
+            <a class="notification-link" href="#"
+               onclick="qfpOpenNotifications(event)">
+
+                Notifications
+
+            </a>
+
+        </div>
+
+
+    </div>
+
+
+
+    <div class="footer-bottom">
+
+        © 2026 Queue-Free Print |
+        All Rights Reserved
+
+    </div>
+
+</footer>
+
+
+
+<!-- ==================================================
+     JAVASCRIPT
+================================================== -->
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+
+
+/* ==================================================
+   PAGINATION + FILTER
+================================================== */
+
+const ordersPerPage = 10;
+let currentPage = 1;
+let filteredOrders = [];
+
+let allOrders = Array.from(document.querySelectorAll(".order-card"));
+
+function updatePagination() {
+    const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+    const start = (currentPage - 1) * ordersPerPage;
+    const end = start + ordersPerPage;
+
+    allOrders.forEach(order => order.style.display = "none");
+
+    filteredOrders.forEach((order, index) => {
+        if (index >= start && index < end) order.style.display = "block";
+    });
+
+    document.getElementById("pageNumber").textContent =
+        "Page " + currentPage + " of " + (totalPages || 1);
+    document.getElementById("previousBtn").disabled = currentPage <= 1;
+    document.getElementById("nextBtn").disabled =
+        totalPages === 0 || currentPage >= totalPages;
+
+    document.getElementById("noOrders").style.display =
+        filteredOrders.length === 0 ? "block" : "none";
+
+    document.getElementById("placedSection").style.display =
+        filteredOrders.some(o => o.dataset.status === "placed") ? "block" : "none";
+    document.getElementById("completedSection").style.display =
+        filteredOrders.some(o => o.dataset.status === "completed") ? "block" : "none";
+}
+
+function nextPage() {
+    const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        updatePagination();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+}
+
+function previousPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        updatePagination();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+}
+
+function applyFilters() {
+    const selectedDate = document.getElementById("filterDate").value;
+    const fromTime = document.getElementById("filterFromTime").value;
+    const toTime = document.getElementById("filterToTime").value;
+
+    if (fromTime && toTime && fromTime > toTime) {
+        document.getElementById("filterResult").textContent =
+            "From Time cannot be later than To Time.";
+        return;
+    }
+
+    filteredOrders = allOrders.filter(order => {
+        const orderDate = order.dataset.date;
+        const orderTime = order.dataset.time;
+        if (selectedDate && orderDate !== selectedDate) return false;
+        if (fromTime && orderTime < fromTime) return false;
+        if (toTime && orderTime > toTime) return false;
+        return true;
+    });
+
+    currentPage = 1;
+    document.getElementById("filterResult").textContent =
+        filteredOrders.length + " order(s) found.";
+    updatePagination();
+}
+
+function clearFilters() {
+    document.getElementById("filterDate").value = "";
+    document.getElementById("filterFromTime").value = "";
+    document.getElementById("filterToTime").value = "";
+    document.getElementById("filterResult").textContent = "";
+    filteredOrders = [...allOrders];
+    currentPage = 1;
+    updatePagination();
+}
+
+
+/* ==================================================
+   NOTIFICATIONS
+================================================== */
+
+function openNotifications(event) { return qfpOpenNotifications(event); }
+
+function closeNotifications() { return qfpCloseNotifications(); }
+
+document.getElementById("notificationPopup").addEventListener("click", function(event) {
+    if (event.target === this) closeNotifications();
+});
+
+
+/* ==================================================
+   DIGITAL RECEIPT
+================================================== */
+
+let currentReceiptOrderId = null;
+
+function openDigitalReceipt(orderId) {
+    currentReceiptOrderId = orderId;
+    const popup = document.getElementById("digitalReceiptPopup");
+    const content = document.getElementById("digitalReceiptContent");
+    const downloadBtn = document.getElementById("downloadReceiptBtn");
+
+    content.innerHTML = '<div class="receipt-loading">Preparing your digital receipt...</div>';
+    downloadBtn.href = `/digital-receipt/${encodeURIComponent(orderId)}/download`;
+    popup.style.display = "flex";
+    popup.setAttribute("aria-hidden", "false");
+
+    fetch(`/api/digital-receipt/${encodeURIComponent(orderId)}`, {
+        method: "GET",
+        headers: {"Accept": "application/json"},
+        cache: "no-store"
+    })
+    .then(async response => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || "Digital receipt could not be loaded.");
+        }
+        return data.receipt;
+    })
+    .then(receipt => {
+        const safe = value => escapeHtml(value ?? "N/A");
+        content.innerHTML = `
+            <div class="receipt-paper">
+                <div class="receipt-brand-row">
+                    <div>
+                        <div class="receipt-brand">Queue-Free <span>Print</span></div>
+                        <div class="receipt-muted">Digital Print & Document Service</div>
+                    </div>
+                    <div class="receipt-title-block">
+                        <strong>DIGITAL RECEIPT</strong>
+                        <span>${safe(receipt.receipt_no)}</span>
+                    </div>
+                </div>
+
+                <div class="receipt-rule"></div>
+
+                <div class="receipt-meta-grid">
+                    <div>
+                        <span>Order ID</span>
+                        <strong>#ORD${String(receipt.order_id).padStart(3, "0")}</strong>
+                    </div>
+                    <div>
+                        <span>Order Date</span>
+                        <strong>${safe(receipt.order_date)}</strong>
+                    </div>
+                    <div>
+                        <span>Payment</span>
+                        <strong>${safe(receipt.payment_method)}</strong>
+                    </div>
+                    <div>
+                        <span>Status</span>
+                        <strong class="receipt-paid">PAID</strong>
+                    </div>
+                </div>
+
+                <div class="receipt-info-grid">
+                    <div class="receipt-info-card">
+                        <span class="receipt-section-label">PRINT CENTRE</span>
+                        <strong>${safe(receipt.shop_name)}</strong>
+                        <small>Shop ID: ${safe(receipt.shop_number)}</small>
+                        <small>GSTIN: ${safe(receipt.gst_number)}</small>
+                        ${receipt.state ? `<small>State: ${safe(receipt.state)}</small>` : ""}
+                    </div>
+                    <div class="receipt-info-card">
+                        <span class="receipt-section-label">CUSTOMER</span>
+                        <strong>${safe(receipt.customer_name)}</strong>
+                        ${receipt.customer_email ? `<small>${safe(receipt.customer_email)}</small>` : ""}
+                        ${receipt.customer_phone ? `<small>${safe(receipt.customer_phone)}</small>` : ""}
+                    </div>
+                </div>
+
+                <div class="receipt-section-heading">PRINT DETAILS</div>
+                <div class="receipt-detail-table">
+                    <div><span>Document</span><strong>${safe(receipt.document)}</strong></div>
+                    <div><span>Copies</span><strong>${safe(receipt.copies)}</strong></div>
+                    <div><span>Colour</span><strong>${safe(receipt.color)}</strong></div>
+                    <div><span>Orientation</span><strong>${safe(receipt.orientation)}</strong></div>
+                    <div><span>Print Side</span><strong>${safe(receipt.print_side)}</strong></div>
+                    <div><span>Page Range</span><strong>${safe(receipt.page_range)}</strong></div>
+                    <div><span>Paper Type</span><strong>${safe(receipt.paper_type)}</strong></div>
+                </div>
+
+                <div class="receipt-total">
+                    <span>Total Paid</span>
+                    <strong>₹${safe(receipt.amount)}</strong>
+                </div>
+
+                <div class="receipt-footer">
+                    <span>Payment Date: ${safe(receipt.payment_date || receipt.order_date)}</span>
+                    <span>Computer-generated receipt</span>
+                </div>
+            </div>
+        `;
+    })
+    .catch(error => {
+        content.innerHTML = `<div class="receipt-error">${escapeHtml(error.message)}</div>`;
+        downloadBtn.removeAttribute("href");
+    });
+}
+
+function closeDigitalReceipt() {
+    const popup = document.getElementById("digitalReceiptPopup");
+    popup.style.display = "none";
+    popup.setAttribute("aria-hidden", "true");
+    currentReceiptOrderId = null;
+}
+
+document.getElementById("digitalReceiptPopup").addEventListener("click", function(event) {
+    if (event.target === this) closeDigitalReceipt();
+});
+
+/* ==================================================
+   ORDER DETAILS
+================================================== */
+
+function showDetails(orderId) {
+    const order = allOrders.find(
+        item => Number(item.dataset.orderId) === Number(orderId)
+    );
+    if (!order) return;
+
+    const statusText = order.dataset.status === "completed"
+        ? "✓ Completed"
+        : order.querySelector(".status").textContent.trim();
+
+    const dateText = order.querySelector(".order-top p").textContent.trim();
+
+    document.getElementById("detailsContent").innerHTML = `
+        <p><span>Order ID</span><strong>#ORD${String(orderId).padStart(3, "0")}</strong></p>
+        <p><span>Document</span><strong>${escapeHtml(order.dataset.document)}</strong></p>
+        <p><span>Copies</span><strong>${escapeHtml(order.dataset.copies)}</strong></p>
+        <p><span>Color</span><strong>${order.dataset.color === "color" ? "Color" : "Black & White"}</strong></p>
+        <p><span>Orientation</span><strong>${escapeHtml(order.dataset.orientation)}</strong></p>
+        <p><span>Print Side</span><strong>${order.dataset.printSide === "double" ? "Double-Sided" : "Single-Sided"}</strong></p>
+        <p><span>Page Range</span><strong>${escapeHtml(order.dataset.pageRange)}</strong></p>
+        <p><span>Paper Type</span><strong>${escapeHtml(order.dataset.paperType)}</strong></p>
+        <p><span>Additional Requirements</span><strong>${escapeHtml(order.dataset.additional || "None")}</strong></p>
+        <p><span>Shop</span><strong>${escapeHtml(order.dataset.shop)}</strong></p>
+        <p><span>Payment</span><strong>${escapeHtml(formatPaymentDisplay(order.dataset.paymentMethod, order.dataset.paymentStatus))}</strong></p>
+        <p><span>Cost</span><strong>₹${escapeHtml(order.dataset.cost)}</strong></p>
+        <p><span>Date & Time</span><strong>${escapeHtml(dateText)}</strong></p>
+        <p><span>Status</span><strong>${escapeHtml(statusText)}</strong></p>
+        <p><span>Total Pages</span><strong>${escapeHtml(order.dataset.totalPages)}</strong></p>
+        <p><span>Blank Pages</span><strong>${escapeHtml(order.dataset.blankPages)}</strong></p>
+        <p><span>Blurry Pages</span><strong>${escapeHtml(order.dataset.blurryPages)}</strong></p>
+        <p><span>Unrecognizable Pages</span><strong>${escapeHtml(order.dataset.unrecognizablePages)}</strong></p>
+    `;
+
+    document.getElementById("detailsPopup").style.display = "flex";
+}
+
+function formatPaymentDisplay(method, status) {
+    if (method === "cash") return status === "paid" ? "Cash • Paid" : "Cash • Pay at Shop";
+    if (status === "paid") return (method || "online").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) + " • Paid";
+    return "Payment Pending";
+}
+
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;",
+        '"': "&quot;", "'": "&#039;"
+    }[char]));
+}
+
+function closeDetails() {
+    document.getElementById("detailsPopup").style.display = "none";
+}
+
+document.getElementById("detailsPopup").addEventListener("click", function(event) {
+    if (event.target === this) closeDetails();
+});
+
+
+/* ==================================================
+   WARNING POPUP
+================================================== */
+
+function showWarning(message, title = "Notice", icon = "!", primaryAction = null) {
+    document.getElementById("warningTitle").textContent = title;
+    document.getElementById("warningMessage").textContent = message;
+    document.getElementById("warningIcon").textContent = icon;
+    window.warningPrimary = primaryAction;
+    document.getElementById("warningCancelBtn").style.display = primaryAction ? "inline-block" : "none";
+    document.getElementById("warningOkBtn").textContent = primaryAction ? "Yes, Continue" : "OK";
+    document.getElementById("warningOverlay").style.display = "flex";
+}
+
+function closeWarning() {
+    document.getElementById("warningOverlay").style.display = "none";
+    window.warningPrimary = null;
+}
+
+function warningPrimaryAction() {
+    const action = window.warningPrimary;
+    if (typeof action === "function") {
+        action();
+    } else {
+        closeWarning();
+    }
+}
+
+
+/* ==================================================
+   CANCEL ORDER
+================================================== */
+
+let cancelOrderId = null;
+
+function cancelOrder(orderId) {
+    cancelOrderId = orderId;
+
+    document.getElementById("cancelOrderMessage").textContent =
+        "Are you sure you want to cancel order #ORD" +
+        String(orderId).padStart(3, "0") + "?";
+
+    document.getElementById("cancelOrderPopup").style.display = "flex";
+}
+
+function closeCancelOrderPopup() {
+    cancelOrderId = null;
+    document.getElementById("cancelOrderPopup").style.display = "none";
+}
+
+async function confirmCancelOrder() {
+    if (cancelOrderId === null) return;
+
+    const orderId = cancelOrderId;
+    closeCancelOrderPopup();
+
+    try {
+        const response = await fetch(
+            `/cancel-order/${encodeURIComponent(orderId)}`,
+            { method: "POST", headers: {"X-Requested-With": "XMLHttpRequest"} }
+        );
+        let result = null;
+        try {
+            result = await response.json();
+        } catch (parseError) {
+            // The order may already have been cancelled successfully even if
+            // the response could not be parsed (for example after a session
+            // redirect). Refresh the list instead of showing a false error.
+            window.location.reload();
+            return;
+        }
+
+        if (!response.ok || !result.success) {
+            // Do not show a second "Unable to cancel" popup. Refresh the list
+            // so the UI reflects the actual server-side order state.
+            window.location.reload();
+            return;
+        }
+
+        const order = allOrders.find(
+            item => Number(item.dataset.orderId) === Number(orderId)
+        );
+
+        if (order) {
+            // Remove the cancelled card immediately; no page refresh is required.
+            order.remove();
+            const index = allOrders.indexOf(order);
+            if (index !== -1) allOrders.splice(index, 1);
+            filteredOrders = allOrders.filter(item => item.dataset.status !== "cancelled");
+            const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+            if (totalPages > 0 && currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+        }
+
+        try {
+            localStorage.setItem("qfp_order_updated", String(Date.now()));
+            if (window.BroadcastChannel) {
+                const channel = new BroadcastChannel("qfp_order_channel");
+                channel.postMessage({orderId, status: "cancelled"});
+                channel.close();
+            }
+        } catch (e) {}
+
+        document.getElementById("filterResult").textContent =
+            "Order #ORD" + String(orderId).padStart(3, "0") +
+            " has been cancelled.";
+        updatePagination();
+
+    } catch (error) {
+        // Cancellation confirmation is the only cancellation popup.
+        // If the request/response has an issue, refresh the order list
+        // instead of showing a misleading "Unable to cancel" popup.
+        window.location.reload();
+    }
+}
+
+
+/* ==================================================
+   REORDER
+================================================== */
+
+function reorder(orderId) {
+    showWarning(
+        "Place this completed order again as a new order?",
+        "Reorder Confirmation",
+        "?",
+        () => reorderConfirmed(orderId)
+    );
+}
+
+async function reorderConfirmed(orderId) {
+    closeWarning();
+
+    try {
+        const response = await fetch(
+            `/reorder/${encodeURIComponent(orderId)}`,
+            {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json"
+                }
+            }
+        );
+
+        // Read as text first so an unexpected server response can never make
+        // the UI fall into the misleading generic "Unable to reorder" error.
+        const responseText = await response.text();
+        let result = {};
+        try {
+            result = responseText ? JSON.parse(responseText) : {};
+        } catch (_) {
+            result = {};
+        }
+
+        if (!response.ok || !result.success) {
+            showWarning(
+                result.error || `Reorder could not be placed (HTTP ${response.status}).`,
+                "Reorder Failed",
+                "!"
+            );
+            return;
+        }
+
+        // The reorder endpoint creates a fresh unpaid order and stores it
+        // in the session as the pending payment. Open the normal dashboard
+        // payment screen so the student gets UPI, QR and Cash at Shop.
+        window.location.href = "/user-dashboard";
+
+    } catch (error) {
+        showWarning("Unable to reach the reorder service. Please try again.", "Reorder Failed", "!");
+    }
+}
+
+
+
+/* ==================================================
+   EDIT PENDING ORDER
+================================================== */
+let editOrderState=null, editNewFiles=[], editNewAnalyses=[], editPaymentData=null, editPaymentMethod='cash', editQrTimer=null;
+function showEditError(msg){const e=document.getElementById('editOrderError');e.textContent=msg;e.style.display='block';}
+function clearEditError(){const e=document.getElementById('editOrderError');e.textContent='';e.style.display='none';}
+async function openEditOrder(orderId){
+ clearEditError();
+ try{const r=await fetch('/edit-order/'+encodeURIComponent(orderId),{credentials:'same-origin'});const d=await r.json();if(!r.ok||!d.success)throw new Error(d.error||'Could not load order.');
+  editOrderState=d;editNewFiles=[];editNewAnalyses=[];
+  document.getElementById('editOrderIdLabel').textContent='#ORD'+String(orderId).padStart(3,'0');
+  document.getElementById('editCopies').value=d.order.copies||1;document.getElementById('editColor').value=d.order.color||'black_white';document.getElementById('editOrientation').value=d.order.orientation||'portrait';document.getElementById('editPrintSide').value=d.order.print_side||'single';document.getElementById('editPageRange').value=d.order.page_range||'all';document.getElementById('editPaperType').value=d.order.paper_type||'printing';document.getElementById('editAdditional').value=d.order.additional_requirements||'';
+  renderEditDocs();renderNewDocs();document.getElementById('editAiStatus').textContent='Add documents to start fast analysis. Existing documents retain their saved analysis.';document.getElementById('editNewTotal').textContent=`₹${Number(d.order.estimated_cost||0).toFixed(2)}`;document.getElementById('editResidualText').textContent=`Already paid: ₹${Number(d.order.paid_amount||0).toFixed(2)}`;document.getElementById('editOrderPopup').style.display='flex';refreshEditEstimatedCost();
+ }catch(e){showWarning(e.message||'Could not open edit order.','Edit Order');}
+}
+function closeEditOrder(){document.getElementById('editOrderPopup').style.display='none';editOrderState=null;editNewFiles=[];editNewAnalyses=[];}
+function renderEditDocs(){const box=document.getElementById('editExistingDocs');box.innerHTML=(editOrderState?.items||[]).map(x=>`<div class="qfp-doc-row" data-item-id="${x.item_id}"><span>📄 ${escapeHtml(x.file_name||'Document')}<small>${Number(x.total_pages||0)} pages</small></span><button type="button" onclick="removeEditDoc(${x.item_id})">Remove</button></div>`).join('')||'<div class="qfp-empty-doc">No existing documents.</div>';}
+function removeEditDoc(id){const item=(editOrderState.items||[]).find(x=>Number(x.item_id)===Number(id));if(!item)return;if(!editOrderState.removed)editOrderState.removed=[];if(!editOrderState.removed.includes(Number(id)))editOrderState.removed.push(Number(id));const el=document.querySelector(`.qfp-doc-row[data-item-id="${id}"]`);if(el){el.classList.add('removed');el.querySelector('button').textContent='Undo';el.querySelector('button').onclick=()=>undoEditDoc(id);}refreshEditEstimatedCost(); }
+function undoEditDoc(id){editOrderState.removed=(editOrderState.removed||[]).filter(x=>Number(x)!==Number(id));const el=document.querySelector(`.qfp-doc-row[data-item-id="${id}"]`);if(el){el.classList.remove('removed');el.querySelector('button').textContent='Remove';el.querySelector('button').onclick=()=>removeEditDoc(id);}refreshEditEstimatedCost();}
+document.addEventListener('change',e=>{
+  if(e.target.id!=='editNewDocuments')return;
+  const picked=Array.from(e.target.files||[]);
+  if(picked.length){
+    picked.forEach(f=>{editNewFiles.push(f);editNewAnalyses.push(null);});
+    renderNewDocs();
+    document.getElementById('editAiStatus').textContent=`${picked.length} document(s) added. Starting fast analysis...`;
+    // Analyze immediately so the user does not have to wait/click again.
+    analyzeEditDocuments();
+  }
+  e.target.value='';
+});
+
+function removeNewEditDoc(index){
+  if(index<0||index>=editNewFiles.length)return;
+  editNewFiles.splice(index,1);
+  editNewAnalyses.splice(index,1);
+  renderNewDocs();
+  const pending=editNewAnalyses.filter(x=>!x).length;
+  document.getElementById('editAiStatus').textContent=editNewFiles.length?(pending?`${pending} document(s) need fast analysis.`:'All added documents analyzed.'):'No new documents added.';
+  refreshEditEstimatedCost();
+}
+
+function renderNewDocs(){
+  const box=document.getElementById('editNewDocsList');
+  box.innerHTML=editNewFiles.map((f,i)=>{
+    const a=editNewAnalyses[i];
+    const details=a ? `<div class="qfp-analysis-details">
+      <span>Pages <b>${Number(a.total_pages||0)}</b></span>
+      <span>Blank <b>${Number(a.blank_pages||0)}</b></span>
+      <span>Duplicate <b>${Number(a.duplicate_pages||0)}</b></span>
+      <span>Blurred <b>${Number(a.blurry_pages||0)}</b></span>
+      <span>Unclear <b>${Number(a.unrecognizable_pages||0)}</b></span>
+    </div>` : '<div class="qfp-analysis-details qfp-analysis-pending">Waiting for fast analysis...</div>';
+    return `<div class="qfp-new-doc">
+      <div class="qfp-new-doc-main"><span class="qfp-new-doc-name">＋ ${escapeHtml(f.name)} <em>${a?'✓ Analysis complete':'Not analyzed'}</em></span>${details}</div>
+      <button type="button" class="qfp-new-remove" aria-label="Remove ${escapeHtml(f.name)}" onclick="removeNewEditDoc(${i})">Remove</button>
+    </div>`;
+  }).join('');
+}
+
+async function analyzeEditDocuments(){
+  if(!editNewFiles.length){document.getElementById('editAiStatus').textContent='No new document selected. Existing documents retain their saved analysis.';refreshEditEstimatedCost();return;}
+  const pendingIndices=editNewFiles.map((_,i)=>i).filter(i=>!editNewAnalyses[i]);
+  if(!pendingIndices.length){document.getElementById('editAiStatus').textContent='All added documents are already analyzed.';renderNewDocs();refreshEditEstimatedCost();return;}
+  const btn=document.getElementById('editAnalyzeBtn');
+  btn.disabled=true;btn.textContent='Analyzing document...';
+  const fd=new FormData();pendingIndices.forEach(i=>fd.append('documents',editNewFiles[i]));
+  try{
+    const r=await fetch('/analyze-edit-documents',{method:'POST',body:fd,credentials:'same-origin'});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.error||'AI analysis failed.');
+    (d.results||[]).forEach((result,j)=>{editNewAnalyses[pendingIndices[j]]=result;});
+    renderNewDocs();
+    const remaining=editNewAnalyses.filter(x=>!x).length;
+    document.getElementById('editAiStatus').textContent=remaining?`${remaining} document(s) still need fast analysis.`:`AI analysis complete — ${editNewFiles.length} document(s) checked.`;
+    refreshEditEstimatedCost();
+  }catch(e){document.getElementById('editAiStatus').textContent=e.message||'AI analysis failed.';}
+  finally{btn.disabled=false;btn.textContent='🔍 AI Analysis';}
+}
+
+async function refreshEditEstimatedCost(){
+  if(!editOrderState?.order?.order_id)return;
+  const fd=new FormData();
+  fd.append('removed_item_ids',JSON.stringify(editOrderState.removed||[]));
+  fd.append('new_pages',String(editNewAnalyses.reduce((a,x)=>a+Number(x?.total_pages||0),0)));
+  fd.append('copies',document.getElementById('editCopies').value||1);
+  fd.append('paper_type',document.getElementById('editPaperType').value||'printing');
+  try{
+    const r=await fetch('/edit-order/'+editOrderState.order.order_id+'/cost',{method:'POST',body:fd,credentials:'same-origin'});
+    const d=await r.json();
+    if(!r.ok||!d.success)throw new Error(d.error||'');
+    document.getElementById('editNewTotal').textContent=`₹${Number(d.new_cost).toFixed(2)}`;
+    document.getElementById('editResidualText').textContent=Number(d.residual_amount)>0?`Additional payment: ₹${Number(d.residual_amount).toFixed(2)} (already paid ₹${Number(d.paid_amount).toFixed(2)})`:`No additional payment required (already paid ₹${Number(d.paid_amount).toFixed(2)})`;
+  }catch(e){
+    document.getElementById('editNewTotal').textContent='₹—';
+    document.getElementById('editResidualText').textContent='Cost will be recalculated when changes are saved.';
+  }
+}
+
+['editCopies','editColor','editOrientation','editPrintSide','editPageRange','editPaperType','editAdditional'].forEach(id=>{
+  document.addEventListener('input',e=>{if(e.target.id===id)refreshEditEstimatedCost();});
+  document.addEventListener('change',e=>{if(e.target.id===id)refreshEditEstimatedCost();});
+});
+
+async function saveEditedOrder(){
+ if(!editOrderState)return;
+ clearEditError();
+ if(editNewFiles.length&&(!editNewAnalyses.length||editNewAnalyses.length!==editNewFiles.length||editNewAnalyses.some(a=>!a))){showEditError('Please run AI Analysis for every newly added document.');return;}
+ const remaining=(editOrderState.items||[]).filter(x=>!(editOrderState.removed||[]).includes(Number(x.item_id)));
+ if(!remaining.length&&!editNewFiles.length){showEditError('At least one document must remain.');return;}
+ const btn=document.getElementById('saveEditBtn');btn.disabled=true;btn.textContent='Saving...';
+ const fd=new FormData();
+ editNewFiles.forEach(f=>fd.append('documents',f));
+ fd.append('removed_item_ids',JSON.stringify(editOrderState.removed||[]));
+ fd.append('analyses',JSON.stringify(editNewAnalyses));
+ fd.append('copies',document.getElementById('editCopies').value);
+ fd.append('color',document.getElementById('editColor').value);
+ fd.append('orientation',document.getElementById('editOrientation').value);
+ fd.append('print_side',document.getElementById('editPrintSide').value);
+ fd.append('page_range',document.getElementById('editPageRange').value||'all');
+ fd.append('paper_type',document.getElementById('editPaperType').value);
+ fd.append('additional_requirements',document.getElementById('editAdditional').value||'');
+ fd.append('total_pages',editNewAnalyses.reduce((a,x)=>a+Number(x.total_pages||0),0));
+ fd.append('blank_pages',editNewAnalyses.reduce((a,x)=>a+Number(x.blank_pages||0),0));
+ fd.append('duplicate_pages',editNewAnalyses.reduce((a,x)=>a+Number(x.duplicate_pages||0),0));
+ fd.append('blurry_pages',editNewAnalyses.reduce((a,x)=>a+Number(x.blurry_pages||0),0));
+ fd.append('unrecognizable_pages',editNewAnalyses.reduce((a,x)=>a+Number(x.unrecognizable_pages||0),0));
+ try{
+   const r=await fetch('/edit-order/'+editOrderState.order.order_id,{method:'POST',body:fd,credentials:'same-origin'});
+   const d=await r.json();
+   if(!r.ok||!d.success)throw new Error(d.error||'Could not save changes.');
+   const residualAmount=Number(d.residual_amount ?? String(d.residual||'0').replace(/[^0-9.-]/g,''));
+   d.residual_amount=Number.isFinite(residualAmount)?residualAmount:0;
+   document.getElementById('editOrderPopup').style.display='none';
+   if(d.residual_amount>0.009){
+     setTimeout(()=>openEditPayment(d),100);
+   }else{
+     showWarning('Changes saved successfully. No additional payment is required. Your order ID and queue position remain unchanged.','Order Updated','✓',()=>window.location.reload());
+   }
+ }catch(e){showEditError(e.message||'Could not save changes.');}
+ finally{btn.disabled=false;btn.textContent='Save Changes';}
+}
+const EDIT_PAYMENT_TEMPLATE=`<div class="qfp-edit-head"><div><span class="qfp-edit-eyebrow">REMAINING PAYMENT</span><h2>Complete Payment</h2><p>Only the additional amount is payable.</p></div><button type="button" onclick="closeEditPayment()">×</button></div><div class="qfp-payment-summary"><span>Order ID <b id="editPaymentOrderId"></b></span><span>Remaining Amount <b id="editPaymentAmount">₹0.00</b></span></div><div class="qfp-payment-methods"><button id="editPayUpi" onclick="selectEditPayment('upi')">UPI<small>Razorpay UPI</small></button><button id="editPayQr" onclick="selectEditPayment('qr')">▦ QR<small>Scan with UPI app</small></button><button id="editPayCash" onclick="selectEditPayment('cash')">₹ Cash<small>Pay at shop</small></button></div><div id="editQrPanel" class="qfp-qr-pay" style="display:none"><span id="editQrStatus">Waiting for payment</span><img id="editQrImage" src="" alt="UPI QR"><b id="editQrAmount">₹0.00</b></div><div id="editPaymentError" class="qfp-edit-error" style="display:none"></div><button id="editPayContinue" class="qfp-pay-continue" onclick="continueEditPayment()">Continue</button>`;
+function openEditPayment(d){
+ const box=document.querySelector('#editPaymentPopup .qfp-payment-box');
+ if(box && !document.getElementById('editPaymentOrderId')) box.innerHTML=EDIT_PAYMENT_TEMPLATE;
+ editPaymentData=d;
+ editPaymentMethod='cash';
+ document.getElementById('editPaymentOrderId').textContent='#ORD'+String(d.order_id).padStart(3,'0');
+ document.getElementById('editPaymentAmount').textContent=d.residual;
+ document.getElementById('editQrAmount').textContent=d.residual;
+ document.getElementById('editPaymentError').style.display='none';
+ document.getElementById('editQrPanel').style.display='none';
+ document.getElementById('editPaymentPopup').style.display='flex';
+ selectEditPayment('cash');
+}
+function closeEditPayment(){if(editQrTimer){clearInterval(editQrTimer);editQrTimer=null;}document.getElementById('editPaymentPopup').style.display='none';}
+function showEditPaymentSuccess(message='Changes saved successfully.'){
+ if(editQrTimer){clearInterval(editQrTimer);editQrTimer=null;}
+ const box=document.querySelector('#editPaymentPopup .qfp-payment-box');
+ if(!box)return;
+ box.innerHTML=`<div class="qfp-payment-success"><div class="qfp-success-icon">✓</div><span class="qfp-edit-eyebrow">CHANGES SAVED</span><h2>Order Updated Successfully</h2><p>${escapeHtml(message)}</p><div class="qfp-payment-summary"><span>Order ID <b>#ORD${String(editPaymentData?.order_id||'').padStart(3,'0')}</b></span><span>Queue Position <b>Unchanged</b></span></div><button class="qfp-pay-continue" type="button" onclick="window.location.reload()">Continue</button></div>`;
+}
+function selectEditPayment(method){
+ editPaymentMethod=method;
+ ['upi','qr','cash'].forEach(x=>{const b=document.getElementById('editPay'+x.charAt(0).toUpperCase()+x.slice(1));if(b)b.classList.toggle('selected',x===method);});
+ const panel=document.getElementById('editQrPanel');if(panel)panel.style.display=method==='qr'?'block':'none';
+ const btn=document.getElementById('editPayContinue');if(btn)btn.textContent=method==='upi'?'Pay with UPI':method==='qr'?'Generate Payment QR':'Confirm Cash at Shop';
+}
+function showEditPaymentError(msg){const e=document.getElementById('editPaymentError');e.textContent=msg;e.style.display='block';}
+async function continueEditPayment(){
+ const d=editPaymentData;if(!d)return;
+ const btn=document.getElementById('editPayContinue');btn.disabled=true;
+ try{
+   if(editPaymentMethod==='cash'){
+     const r=await fetch('/payment/cash/'+d.order_id,{method:'POST',credentials:'same-origin'});const x=await r.json();
+     if(!r.ok||!x.success)throw new Error(x.error||'Could not select cash payment.');
+     showEditPaymentSuccess('Your changes are saved. Cash payment is selected and can be paid at the shop when you collect the printout.');
+     return;
+   }
+   if(editPaymentMethod==='qr'){
+     const r=await fetch('/payment/qr/start/'+d.order_id,{method:'POST',credentials:'same-origin'});const x=await r.json();
+     if(!r.ok||!x.success)throw new Error(x.error||'Could not generate QR.');
+     document.getElementById('editQrImage').src=x.qr.image_url;document.getElementById('editQrStatus').textContent='Waiting for payment';btn.textContent='Waiting for UPI Payment...';btn.disabled=true;
+     if(editQrTimer)clearInterval(editQrTimer);editQrTimer=setInterval(checkEditQrPayment,3000);await checkEditQrPayment();return;
+   }
+   const r=await fetch('/payment/start/'+d.order_id,{method:'POST',credentials:'same-origin'});const x=await r.json();
+   if(!r.ok||!x.success)throw new Error(x.error||'Could not start UPI payment.');
+   const pay=x.payment;
+   const options={key:pay.key_id,amount:pay.amount_paise,currency:'INR',name:'Queue-Free Print',description:'Remaining payment for Order #ORD'+String(d.order_id).padStart(3,'0'),order_id:pay.order_id,prefill:{name:pay.name||'',email:pay.email||'',contact:pay.contact||''},display:{hide:[{method:'card'},{method:'netbanking'},{method:'wallet'}],preferences:{show_default_blocks:true}},handler:async function(resp){
+     const vr=await fetch('/payment/verify',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({order_id:d.order_id,razorpay_payment_id:resp.razorpay_payment_id,razorpay_order_id:resp.razorpay_order_id,razorpay_signature:resp.razorpay_signature})});
+     const v=await vr.json();if(!vr.ok||!v.success)throw new Error(v.error||'Payment verification failed.');
+     showEditPaymentSuccess('Payment received and your order changes have been saved.');
+   },modal:{ondismiss:()=>{btn.disabled=false;btn.textContent='Pay with UPI';}}};
+   new Razorpay(options).open();
+ }catch(e){btn.disabled=false;showEditPaymentError(e.message||'Payment could not be started.');}
+}
+async function checkEditQrPayment(){
+ const d=editPaymentData;if(!d)return;
+ try{const r=await fetch('/payment/qr/status/'+d.order_id,{credentials:'same-origin'});const x=await r.json();
+   if(x.success&&x.status==='paid'){clearInterval(editQrTimer);editQrTimer=null;showEditPaymentSuccess('Payment received and your order changes have been saved.');}
+ }catch(e){}
+}
+
+
+/* ==================================================
+   LOGOUT
+================================================== */
+
+function confirmLogout(event) {
+    event.preventDefault();
+    document.getElementById("logoutPopup").style.display = "flex";
+}
+
+function closeLogoutPopup() {
+    document.getElementById("logoutPopup").style.display = "none";
+}
+
+function logoutUser() {
+    window.location.replace("/logout");
+}
+
+document.getElementById("warningOverlay").addEventListener("click", function(event) {
+    if (event.target === this) closeWarning();
+});
+
+document.getElementById("cancelOrderPopup").addEventListener("click", function(event) {
+    if (event.target === this) closeCancelOrderPopup();
+});
+
+
+document.getElementById("logoutPopup").addEventListener("click", function(event) {
+    if (event.target === this) closeLogoutPopup();
+});
+
+
+/* ==================================================
+   LIVE WAITING-TIME PREDICTION
+================================================== */
+
+let waitTimeTimer = null;
+
+async function refreshWaitTimes() {
+    const panels = document.querySelectorAll('.wait-time-panel[data-order-id]');
+    await Promise.all(Array.from(panels).map(async (panel) => {
+        const orderId = panel.dataset.orderId;
+        if (!orderId) return;
+        try {
+            const response = await fetch(`/api/order-wait-time/${encodeURIComponent(orderId)}`, {
+                method: 'GET',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache' }
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) return;
+
+            const text = panel.querySelector('.wait-time-text');
+            const meta = panel.querySelector('.wait-time-meta');
+            const position = panel.querySelector('.wait-position');
+            if (text) text.textContent = data.estimated_wait_text || 'Waiting-time unavailable';
+            if (position) position.textContent = data.queue_position || '—';
+
+            if (data.active) {
+                if (meta) meta.textContent = `${data.orders_ahead || 0} order${(data.orders_ahead || 0) === 1 ? '' : 's'} ahead • updates automatically`;
+                panel.classList.remove('wait-time-done');
+            } else {
+                if (meta) meta.textContent = `Status: ${(data.status || '').replace(/_/g, ' ')}`;
+                if (position) position.textContent = '✓';
+                panel.classList.add('wait-time-done');
+            }
+        } catch (error) {
+            // Keep the previous prediction visible if a temporary request fails.
+        }
+    }));
+}
+
+function startWaitTimeUpdates() {
+    refreshWaitTimes();
+    if (waitTimeTimer) clearInterval(waitTimeTimer);
+    // Recalculate while the student remains on Order History.
+    waitTimeTimer = setInterval(refreshWaitTimes, 10000);
+}
+
+/* ==================================================
+   INITIAL LOAD
+================================================== */
+
+window.onload = function() {
+    filteredOrders = [...allOrders];
+    updatePagination();
+    startWaitTimeUpdates();
+};
+
+</script>
+
+
+
+<!-- Secure QR Delivery Scanner -->
+<div id="qrScanModal" class="qfp-qr-modal" aria-hidden="true">
+  <div class="qfp-qr-card">
+    <button class="qfp-qr-close" type="button" onclick="closeQRScanner()" aria-label="Close">&times;</button>
+    <h2>Secure QR Delivery</h2>
+    <p>Scan the QR code printed on the front page of your QueueFree printout.</p>
+    <div id="qfpQrReader"></div>
+    <div id="qfpQrResult" class="qfp-qr-result"></div>
+    <div class="qfp-qr-manual">
+      <input id="qfpQrToken" type="text" placeholder="Paste QR token or verification link">
+      <button type="button" onclick="verifyQRManual()">Verify</button>
+    </div>
+    <small>You must be logged in as the student who placed the order. Wrong-student QR codes will not change the order status.</small>
+  </div>
+</div>
+<style>
+.qfp-qr-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:99999;align-items:center;justify-content:center;padding:20px}
+.qfp-qr-modal.show{display:flex}.qfp-qr-card{position:relative;width:min(560px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;padding:26px;box-shadow:0 25px 70px rgba(0,0,0,.2)}
+.qfp-qr-close{position:absolute;right:14px;top:10px;border:0;background:transparent;font-size:30px;cursor:pointer;color:#555}.qfp-qr-card h2{margin:0 35px 6px 0}.qfp-qr-card p{margin:0 0 18px;color:#667085}.qfp-qr-card #qfpQrReader{width:100%;max-width:460px;margin:auto}.qfp-qr-result{margin-top:15px;padding:12px;border-radius:10px;display:none}.qfp-qr-result.show{display:block}.qfp-qr-result.ok{background:#effaf2;border:1px solid #b9dfc2}.qfp-qr-result.bad{background:#fff4f4;border:1px solid #efc1c1}.qfp-qr-manual{display:flex;gap:8px;margin-top:15px}.qfp-qr-manual input{flex:1;padding:11px;border:1px solid #ccd3de;border-radius:9px}.qfp-qr-manual button{padding:11px 15px;border:0;border-radius:9px;cursor:pointer}.qfp-qr-card small{display:block;margin-top:12px;color:#777;line-height:1.45}
+</style>
+<script>
+let qfpQrScanner=null;
+let qfpQrBusy=false;
+function openQRScanner(e){
+  if(e)e.preventDefault();
+  const modal=document.getElementById('qrScanModal');
+  modal.classList.add('show'); modal.setAttribute('aria-hidden','false');
+  document.getElementById('qfpQrResult').className='qfp-qr-result';
+  document.getElementById('qfpQrResult').innerHTML='';
+  setTimeout(startQRScanner,100);
+}
+async function startQRScanner(){
+  if(!window.Html5Qrcode || qfpQrScanner) return;
+  qfpQrScanner=new Html5Qrcode('qfpQrReader');
+  try{
+    await qfpQrScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:250,height:250}},onQRScanned,()=>{});
+  }catch(err){
+    showQRResult(false,'Camera unavailable. Allow camera access or use the manual verification field below.');
+  }
+}
+async function stopQRScanner(){
+  if(qfpQrScanner){try{await qfpQrScanner.stop();}catch(e){} try{qfpQrScanner.clear();}catch(e){} qfpQrScanner=null;}
+}
+function closeQRScanner(){
+  const modal=document.getElementById('qrScanModal');
+  modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); stopQRScanner();
+}
+function extractQRToken(value){
+  value=(value||'').trim();
+  try{
+    const u=new URL(value,window.location.origin);
+    const m=u.pathname.match(/\/verify-delivery\/([^/]+)/);
+    if(m)return m[1];
+    if(u.searchParams.get('token'))return u.searchParams.get('token');
+  }catch(e){}
+  return value;
+}
+function onQRScanned(decodedText){
+  if(qfpQrBusy)return; qfpQrBusy=true;
+  verifyQRToken(extractQRToken(decodedText));
+}
+function verifyQRManual(){verifyQRToken(extractQRToken(document.getElementById('qfpQrToken').value));}
+function verifyQRToken(token){
+  if(!token){qfpQrBusy=false;showQRResult(false,'Invalid QR Code.');return;}
+  stopQRScanner();
+  // Backend performs the security check: QR token -> order -> user -> match.
+  window.location.href="{{ url_for('verify_delivery', token='TOKEN_PLACEHOLDER') }}".replace('TOKEN_PLACEHOLDER',encodeURIComponent(token));
+}
+function showQRResult(ok,msg){
+  const box=document.getElementById('qfpQrResult'); box.className='qfp-qr-result show '+(ok?'ok':'bad');
+  box.textContent=msg;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeQRScanner()});
+</script>
+
+</body>
+
+</html>

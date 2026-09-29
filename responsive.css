@@ -1,0 +1,168 @@
+
+
+/* =========================================================
+   QUEUEFREE GLOBAL UI OVERRIDES
+   Existing elements only — no new alerts/warnings added.
+   Keeps navigation, messages and responsive layout consistent.
+========================================================= */
+
+* { box-sizing: border-box; }
+
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* ---- Common navigation ---- */
+nav {
+    min-height: 72px !important;
+    height: 72px;
+    padding: 0 clamp(16px, 5vw, 72px) !important;
+    gap: 18px;
+}
+
+nav .logo, nav .logo a {
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+nav .nav-links {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: clamp(12px, 2vw, 28px);
+}
+
+nav .nav-links a {
+    white-space: nowrap;
+}
+
+/* ---- Existing success/error/message elements ---- */
+.form-error,
+.ai-error,
+.payment-error,
+.pricing-message.error,
+.profile-message.error,
+.password-message.error,
+.save-message.error {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 11px 14px;
+    border: 1px solid #f0caca;
+    border-radius: 9px;
+    background: #fff5f5;
+    color: #b42318;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.ai-success,
+.pricing-message.success,
+.profile-message.success,
+.password-message.success,
+.save-message.success,
+.collection-message,
+.success-message {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 11px 14px;
+    border: 1px solid #cce7d5;
+    border-radius: 9px;
+    background: #f2fbf5;
+    color: #18794e;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+/* ---- Existing warning/confirmation popup ---- */
+.warning-overlay {
+    padding: 16px !important;
+}
+
+.warning-box {
+    width: min(430px, 100%) !important;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    padding: clamp(22px, 5vw, 30px) !important;
+}
+
+.warning-box h2 { font-size: clamp(18px, 4vw, 22px) !important; }
+.warning-box p { font-size: 14px !important; }
+
+.warning-buttons {
+    flex-wrap: wrap;
+    gap: 10px !important;
+}
+
+.warning-buttons button {
+    min-height: 42px;
+}
+
+/* ---- Existing success card ---- */
+.success-card,
+.order-success {
+    max-width: 100%;
+}
+
+/* ---- Forms/tables/media cannot exceed viewport ---- */
+img, video, iframe, canvas { max-width: 100%; }
+input, select, textarea, button { max-width: 100%; }
+
+/* ---- Tablet / mobile ---- */
+@media (max-width: 900px) {
+    nav {
+        height: auto;
+        min-height: 68px !important;
+        padding: 12px 18px !important;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    nav .nav-links {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 2px 0 4px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    nav .nav-links::-webkit-scrollbar { display: none; }
+
+    nav .nav-links a { flex: 0 0 auto; }
+}
+
+@media (max-width: 600px) {
+    nav { padding: 10px 14px !important; }
+    nav .logo { font-size: 21px !important; }
+    nav .nav-links { gap: 14px; }
+    nav .nav-links a { font-size: 13px; }
+
+    .warning-buttons { flex-direction: column; }
+    .warning-buttons button { width: 100%; }
+
+    .form-error,
+    .ai-error,
+    .payment-error,
+    .pricing-message.error,
+    .profile-message.error,
+    .password-message.error,
+    .save-message.error,
+    .ai-success,
+    .pricing-message.success,
+    .profile-message.success,
+    .password-message.success,
+    .save-message.success,
+    .collection-message,
+    .success-message {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+}
+
+@media (max-width: 420px) {
+    nav .logo { font-size: 19px !important; }
+    nav .nav-links { gap: 12px; }
+    nav .nav-links a { font-size: 12px; }
+}

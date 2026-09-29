@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Admin Dashboard | Queue-Free Print</title>
+
+    <link rel="stylesheet" href="../static/admin_dashboard.css">
+
+
+<script>
+/* Prevent browser back/BFCache from reopening a protected page after logout. */
+window.addEventListener("pageshow", async function (event) {
+    if (!event.persisted) return;
+
+    try {
+        const response = await fetch("{{ url_for('session_status') }}", {
+            credentials: "same-origin",
+            cache: "no-store"
+        });
+        const data = await response.json();
+
+        if (!data.logged_in) {
+            window.location.replace("{{ url_for('home') }}");
+        }
+    } catch (e) {
+        window.location.replace("{{ url_for('home') }}");
+    }
+});
+</script>
+
+
+<script>
+/* Re-check authentication whenever this protected page is shown, including browser Back/BFCache. */
+(function () {
+    const homeUrl = "{{ url_for('home') }}";
+    const statusUrl = "{{ url_for('session_status') }}";
+
+    async function verifySession() {
+        try {
+            const response = await fetch(statusUrl, {
+                method: "GET",
+                credentials: "same-origin",
+                cache: "no-store",
+                headers: { "Cache-Control": "no-cache" }
+            });
+            const data = await response.json();
+
+            if (!data.logged_in) {
+                window.location.replace(homeUrl);
+            }
+        } catch (error) {
+            window.location.replace(homeUrl);
+        }
+    }
+
+    window.addEventListener("pageshow", verifySession);
+})();
+</script>
+<script src="{{ url_for('static', filename='notifications.js') }}" defer></script>
+
+    <link rel="stylesheet" href="../static/responsive.css">
+</head>
+
+
+<body data-user-role="admin">
+
+
+    <!-- ================= NAVBAR ================= -->
+
+    <nav>
+    <div class="logo">Queue-Free <span>Print</span></div>
+    <div class="nav-links">
+        <a href="{{ url_for('admin_dashboard') }}" class="active">Dashboard</a>
+        <a href="{{ url_for('admin_dashboard') }}#orders">Orders</a>
+        <a href="{{ url_for('analytics') }}">Analytics</a>
+        <a href="{{ url_for('settings') }}">Settings</a>
+        <a class="notification-link" href="#" onclick="qfpOpenNotifications(event)">Notifications <span class="notification-badge" id="notificationBadge" hidden>0</span></a>
+        <a href="#" onclick="confirmLogout(event)">Logout</a>
+    </div>
+</nav>
+
+
+
+    <!-- ================= MAIN DASHBOARD ================= -->
+
+    <main class="dashboard" id="dashboard">
+
+
+        <!-- ================= WELCOME ================= -->
+
+        <section class="welcome">
+
+            <h1>
+                Admin Dashboard 👋
+            </h1>
+
+            <p>
+                Manage student print orders and monitor
+                the printing activity of the shop.
+            </p>
+
+        </section>
+
+
+
+        <!-- ================= TODAY'S ORDERS ================= -->
+
+        <section class="dashboard-section">
+
+            <h2>
+                 Today's Orders
+            </h2>
+
+
+            <div class="order-stats">
+
+
+                <!-- COMPLETED -->
+
+                <div class="stat-card">
+
+                    <span class="stat-icon">
+                        ✅
+                    </span>
+
+                    <h3>
+                        Ready / Delivered
+                    </h3>
+
+                    <strong id="completedOrderCount">
+                        {{ stats.completed }}
+                    </strong>
+
+                    <p>
+                        Orders ready or delivered today
+                    </p>
+
+                </div>
+
+
+
+                <!-- CANCELLED -->
+
+                <div class="stat-card">
+
+                    <span class="stat-icon">
+                        ❌
+                    </span>
+
+                    <h3>
+                        Cancelled
+                    </h3>
+
+                    <strong id="cancelledOrderCount">
+                        {{ stats.cancelled }}
+                    </strong>
+
+                    <p>
+                        Orders cancelled today
+                    </p>
+
+                </div>
+
+
+
+                <!-- TOTAL PAGES -->
+
+                <div class="stat-card">
+
+                    <span class="stat-icon">
+                        📄
+                    </span>
+
+                    <h3>
+                        Total Pages Printed
+                    </h3>
+
+                    <strong id="totalPagesPrinted">
+                        {{ stats.pages }}
+                    </strong>
+
+                    <p>
+                        Pages printed today
+                    </p>
+
+                </div>
+
+
+
+                <!-- TOTAL REVENUE -->
+
+                <div class="stat-card">
+
+                    <span class="stat-icon">
+                        💰
+                    </span>
+
+                    <h3>
+                        Total Revenue
+                    </h3>
+
+                    <strong id="totalRevenue">
+                        ₹{{ "%.2f"|format(stats.revenue|float) }}
+                    </strong>
+
+                    <p>
+                        Revenue generated today
+                    </p>
+
+                </div>
+
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ================= ALL ORDERS ================= -->
+
+        <section class="dashboard-section"
+                 id="orders">
+
+
+            <h2>
+                  All Orders
+            </h2>
+
+
+            <div class="orders-table-container">
+
+
+                <table>
+
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Order ID
+                            </th>
+
+                            <th>
+                                Student Name
+                            </th>
+
+                            <th>
+                                Document
+                            </th>
+
+                            <th>
+                                Action
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+
+                    <tbody id="pendingOrdersBody">
+
+                    {% for order in orders %}
+                    <tr id="order-row-{{ order.order_id }}">
+
+                        <td>
+                            #{{ order.order_id }}
+                        </td>
+
+                        <td>
+                            {{ order.customer }}
+                        </td>
+
+                        <td>
+                            {{ order.document }}
+                        </td>
+
+                        <td>
+                            <div class="action-buttons">
+                                {% if order.order_status == 'pending' %}
+                                <form method="POST"
+                                      action="{{ url_for('update_order', order_id=order.order_id, status='accepted') }}"
+                                      class="order-action-form"
+                                      data-order-id="{{ order.order_id }}"
+                                      onsubmit="return acceptOrder(this);">
+                                    <button type="submit" class="accept-btn">
+                                        Accept
+                                    </button>
+                                </form>
+
+                                <form method="POST"
+                                      action="{{ url_for('update_order', order_id=order.order_id, status='declined') }}"
+                                      class="order-action-form"
+                                      onsubmit="return declineOrder(this);">
+                                    <button type="submit" class="decline-btn">
+                                        Decline
+                                    </button>
+                                </form>
+                                {% else %}
+                                <span class="order-status {{ order.order_status }}">
+                                    {{ order.order_status|capitalize }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                    </tr>
+                    {% else %}
+                    <tr class="qfp-empty-orders">
+                        <td colspan="4" style="text-align:center; padding:30px;">
+                            No orders available for your shop.
+                        </td>
+                    </tr>
+                    {% endfor %}
+
+                </tbody>
+
+                </table>
+
+
+            </div>
+
+        </section>
+
+
+    </main>
+
+
+
+    <!-- ================= CASH PAYMENT TOAST ================= -->
+    <div id="qfpCashToast" class="qfp-action-toast" role="status" aria-live="polite">
+        <div class="qfp-action-toast-icon">✓</div>
+        <div>
+            <strong id="qfpCashToastTitle">Cash Payment Updated</strong>
+            <span id="qfpCashToastMessage">Cash payment marked as received.</span>
+        </div>
+        <button type="button" onclick="hideQfpActionToast()" aria-label="Close">×</button>
+    </div>
+
+    <!-- ================= FOOTER ================= -->
+
+    <footer>
+
+
+        <div class="footer-content">
+
+
+            <!-- ABOUT -->
+
+            <div>
+
+                <h3>
+                    Queue-Free Print
+                </h3>
+
+                <p>
+                    Online printing management system that
+                    helps students avoid long queues and
+                    makes printing simple and convenient.
+                </p>
+
+            </div>
+
+
+
+            <!-- QUICK LINKS -->
+
+            <div>
+
+                <h3>
+                    Quick Links
+                </h3>
+
+
+                <a href="#dashboard">
+                    Dashboard
+                </a>
+
+
+                <a href="#orders">
+                    Orders
+                </a>
+
+
+                <a href="{{ url_for('analytics') }}">
+                    Analytics
+                </a>
+
+
+                <a href="{{ url_for('settings') }}">
+                    Settings
+                </a>
+
+
+                <a href="#" onclick="confirmLogout(event)">
+                    Logout
+                </a>
+
+            </div>
+
+
+        </div>
+
+
+
+        <div class="footer-bottom">
+
+            © 2026 Queue-Free Print | Admin Panel
+
+        </div>
+
+
+    </footer>
+
+
+
+    <!-- ================= ORDER CONFIRMATION POPUP ================= -->
+
+    <div class="order-confirm-overlay" id="orderConfirmPopup">
+
+        <div class="order-confirm-box">
+
+            <div class="order-confirm-icon" id="orderConfirmIcon">
+                ?
+            </div>
+
+            <h2 id="orderConfirmTitle">
+                Confirm Order Action
+            </h2>
+
+            <p id="orderConfirmMessage">
+                Are you sure you want to continue?
+            </p>
+
+            <div class="order-confirm-buttons">
+
+                <button
+                    type="button"
+                    class="order-cancel-btn"
+                    onclick="closeOrderConfirmPopup()">
+                    Cancel
+                </button>
+
+                <button
+                    type="button"
+                    class="order-confirm-btn"
+                    onclick="submitOrderAction()">
+                    Confirm
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================= PRINT DOCUMENT POPUP ================= -->
+
+    <div class="print-document-overlay" id="printDocumentPopup" aria-hidden="true">
+
+        <div class="print-document-box">
+
+            <div class="print-document-header">
+                <div>
+                    <h2>Print Order #<span id="printOrderId"></span></h2>
+                    <p>Print the document completely before closing this window.</p>
+                </div>
+
+                <button
+                    type="button"
+                    class="print-document-close"
+                    onclick="requestPrintDocumentClose()"
+                    aria-label="Close document">
+                    ×
+                </button>
+            </div>
+
+            <div class="print-document-content">
+                <div class="print-document-viewer">
+                    <iframe id="printDocumentFrame" title="Order document"></iframe>
+                </div>
+
+                <aside class="order-preferences-panel" aria-label="Order preferences">
+                    <div class="order-preferences-title">
+                        <h3>Order Preferences</h3>
+                        <span id="orderPreferencesCount">0 documents</span>
+                    </div>
+                    <div id="adminPaymentSummary" class="admin-payment-summary" style="display:none;">
+                        <div class="admin-payment-summary-title">Payment</div>
+                        <div class="admin-payment-summary-main">
+                            <strong id="adminPaymentMethod">-</strong>
+                            <span id="adminPaymentStatus">-</span>
+                        </div>
+                        <div class="admin-payment-summary-amount" id="adminPaymentAmount">₹0.00</div>
+                        <button type="button" id="markCashReceivedBtn" class="mark-cash-btn" onclick="markCashReceived()" style="display:none;">Mark Cash Received</button>
+                    </div>
+                    <div id="orderPreferencesList" class="order-preferences-list"></div>
+                </aside>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================= PRINT COMPLETE WARNING ================= -->
+
+    <div class="print-complete-overlay" id="printCompletePopup" aria-hidden="true">
+
+        <div class="print-complete-box">
+
+            <div class="print-complete-icon">
+                !
+            </div>
+
+            <h2>Sure you have printed this?</h2>
+
+            <p>
+                Please confirm that you have completely printed this order before finishing it.
+            </p>
+
+            <div class="print-complete-buttons">
+
+                <button
+                    type="button"
+                    class="print-complete-close-btn"
+                    onclick="closePrintCompleteWarning()">
+                    Close
+                </button>
+
+                <button
+                    type="button"
+                    class="print-complete-notify-btn"
+                    onclick="sendCompletedNotification()">
+                    Send Notification
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================= LOGOUT CONFIRMATION POPUP ================= -->
+
+    <div class="logout-overlay" id="logoutPopup">
+
+        <div class="logout-box">
+
+            <div class="logout-icon">
+                ?
+            </div>
+
+            <h2>
+                Logout Confirmation
+            </h2>
+
+            <p>
+                Are you sure you want to logout?
+            </p>
+
+            <div class="logout-buttons">
+
+                <button
+                    type="button"
+                    class="cancel-logout-btn"
+                    onclick="closeLogoutPopup()">
+
+                    Cancel
+
+                </button>
+
+                <button
+                    type="button"
+                    class="confirm-logout-btn"
+                    onclick="logoutUser()">
+
+                    Logout
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- ================= JAVASCRIPT ================= -->
+
+    <script>
+
+        let pendingOrderForm = null;
+        let pendingOrderAction = null;
+        let activePrintOrderId = null;
+        let printDocumentUrl = null;
+        let printHistoryStateActive = false;
+        let allowPrintPopupClose = false;
+        let completingOrder = false;
+
+        function acceptOrder(form) {
+            pendingOrderForm = form;
+            pendingOrderAction = "accept";
+
+            document.getElementById("orderConfirmTitle").textContent =
+                "Accept Order";
+            document.getElementById("orderConfirmMessage").textContent =
+                "Are you sure you want to accept this order? The document will open here for printing.";
+            document.getElementById("orderConfirmIcon").textContent = "?";
+            document.getElementById("orderConfirmPopup").style.display = "flex";
+
+            return false;
+        }
+
+        function declineOrder(form) {
+            pendingOrderForm = form;
+            pendingOrderAction = "decline";
+
+            document.getElementById("orderConfirmTitle").textContent =
+                "Decline Order";
+            document.getElementById("orderConfirmMessage").textContent =
+                "Are you sure you want to decline this order? This order will be permanently deleted.";
+            document.getElementById("orderConfirmIcon").textContent = "!";
+            document.getElementById("orderConfirmPopup").style.display = "flex";
+
+            return false;
+        }
+
+        function closeOrderConfirmPopup() {
+            document.getElementById("orderConfirmPopup").style.display = "none";
+            pendingOrderForm = null;
+            pendingOrderAction = null;
+        }
+
+        function updateTodayOrderCount(type) {
+            const element = document.getElementById(
+                type === "completed" ? "completedOrderCount" : "cancelledOrderCount"
+            );
+
+            if (!element) {
+                return;
+            }
+
+            const current = parseInt(element.textContent.trim(), 10) || 0;
+            element.textContent = current + 1;
+        }
+
+        async function submitOrderAction() {
+            if (!pendingOrderForm) {
+                return;
+            }
+
+            const form = pendingOrderForm;
+            const action = pendingOrderAction;
+            const row = form.closest("tr");
+            const orderId = form.dataset.orderId;
+
+            document.getElementById("orderConfirmPopup").style.display = "none";
+            pendingOrderForm = null;
+            pendingOrderAction = null;
+
+            if (action === "decline") {
+                if (row) {
+                    row.remove();
+                }
+
+                const formData = new FormData(form);
+                try {
+                    const response = await fetch(form.action, {
+                        method: "POST",
+                        body: formData
+                    });
+                    if (!response.ok) {
+                        window.location.reload();
+                    } else {
+                        const data = await response.json();
+                        if (data.success && data.status === "cancelled") {
+                            updateTodayOrderCount("cancelled");
+                        } else {
+                            window.location.reload();
+                        }
+                    }
+                } catch (error) {
+                    window.location.reload();
+                }
+                return;
+            }
+
+            // Accept the order first, then show the document inside a same-tab popup.
+            try {
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: new FormData(form)
+                });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    alert(data.error || "Could not accept this order.");
+                    return;
+                }
+
+                if (row) {
+                    row.remove();
+                }
+
+                openPrintDocument(orderId, data.delivery_pdf_url || data.document_url, data.preferences || [], data.payment || null);
+            } catch (error) {
+                alert("Could not open the document. Please try again.");
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/\"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function preferenceLabel(value) {
+            const labels = {
+                black_white: "Black & White",
+                color: "Color",
+                portrait: "Portrait",
+                landscape: "Landscape",
+                single: "Single-sided",
+                double: "Double-sided",
+                all: "All Pages",
+                printing: "Normal Paper"
+            };
+            return labels[value] || String(value || "-").replace(/_/g, " ");
+        }
+
+        function renderOrderPreferences(preferences) {
+            const list = document.getElementById("orderPreferencesList");
+            const count = document.getElementById("orderPreferencesCount");
+            if (!list || !count) return;
+
+            count.textContent = `${preferences.length} ${preferences.length === 1 ? "document" : "documents"}`;
+
+            if (!preferences.length) {
+                list.innerHTML = '<div class="order-preferences-empty">No saved preferences found.</div>';
+                return;
+            }
+
+            list.innerHTML = preferences.map((item, index) => {
+                const requirements = item.additional_requirements
+                    ? `<div class="preference-row preference-requirements"><span>Additional requirements</span><strong>${escapeHtml(item.additional_requirements)}</strong></div>`
+                    : `<div class="preference-row preference-requirements"><span>Additional requirements</span><strong class="no-requirements">None</strong></div>`;
+                const selected = index === 0 ? " selected-document" : "";
+                const selectedText = index === 0 ? "Selected" : "Select";
+
+                return `
+                    <div class="order-preference-card${selected}" id="preferenceCard${escapeHtml(item.item_id)}">
+                        <div class="preference-document-top">
+                            <div class="preference-document-name">${index + 1}. ${escapeHtml(item.file_name)}</div>
+                            <button type="button"
+                                    class="select-document-btn${index === 0 ? " active" : ""}"
+                                    data-item-id="${escapeHtml(item.item_id)}"
+                                    onclick="selectOrderDocument(${escapeHtml(item.item_id)}, '${escapeHtml(item.document_url)}', this)">
+                                ${selectedText}
+                            </button>
+                        </div>
+                        <div class="preference-row"><span>Copies</span><strong>${escapeHtml(item.copies)}</strong></div>
+                        <div class="preference-row"><span>Color</span><strong>${escapeHtml(preferenceLabel(item.color))}</strong></div>
+                        <div class="preference-row"><span>Orientation</span><strong>${escapeHtml(preferenceLabel(item.orientation))}</strong></div>
+                        <div class="preference-row"><span>Print side</span><strong>${escapeHtml(preferenceLabel(item.print_side))}</strong></div>
+                        <div class="preference-row"><span>Page range</span><strong>${escapeHtml(item.page_range || "All Pages")}</strong></div>
+                        <div class="preference-row"><span>Paper</span><strong>${escapeHtml(preferenceLabel(item.paper_type))}</strong></div>
+                        <div class="preference-row"><span>Total pages</span><strong>${escapeHtml(item.total_pages)}</strong></div>
+                        ${requirements}
+                    </div>`;
+            }).join("");
+
+            // Warm preview conversion for other documents in the background.
+            // This does not open or download anything for the user.
+            preferences.forEach((item, index) => {
+                if (index > 0 && item.document_url) {
+                    fetch(item.document_url, { credentials: "same-origin", cache: "no-store" })
+                        .catch(() => {});
+                }
+            });
+        }
+
+        function selectOrderDocument(itemId, documentUrl, button) {
+            if (!documentUrl) return;
+
+            document.querySelectorAll(".select-document-btn").forEach(btn => {
+                btn.classList.remove("active");
+                btn.textContent = "Select";
+            });
+            document.querySelectorAll(".order-preference-card").forEach(card => {
+                card.classList.remove("selected-document");
+            });
+
+            if (button) {
+                button.classList.add("active");
+                button.textContent = "Selected";
+                const card = button.closest(".order-preference-card");
+                if (card) card.classList.add("selected-document");
+            }
+
+            printDocumentUrl = documentUrl;
+            const frame = document.getElementById("printDocumentFrame");
+            if (frame) {
+                // Use the stable preview URL. Converted Office files are cached
+                // on the server, so switching documents is fast after warm-up.
+                frame.src = documentUrl;
+            }
+        }
+
+        function paymentMethodLabel(method) {
+            const labels = { cash: "Cash", upi: "UPI", upi_qr: "UPI QR", card: "Card", netbanking: "Net Banking", wallet: "Wallet" };
+            return labels[method] || (method || "Payment").replace(/_/g, " ");
+        }
+
+        function renderAdminPayment(payment) {
+            const box = document.getElementById("adminPaymentSummary");
+            const method = document.getElementById("adminPaymentMethod");
+            const status = document.getElementById("adminPaymentStatus");
+            const amount = document.getElementById("adminPaymentAmount");
+            const cashBtn = document.getElementById("markCashReceivedBtn");
+            if (!box || !method || !status || !amount) return;
+            if (!payment) { box.style.display = "none"; return; }
+            box.style.display = "block";
+            method.textContent = paymentMethodLabel(payment.method);
+            status.textContent = payment.status === "paid" ? "Paid" : (payment.method === "cash" ? "Pending — Collect Cash" : "Pending");
+            amount.textContent = payment.amount || "₹0.00";
+            if (cashBtn) cashBtn.style.display = payment.method === "cash" && payment.status !== "paid" ? "block" : "none";
+        }
+
+        async function markCashReceived() {
+            if (!activePrintOrderId) return;
+            const btn = document.getElementById("markCashReceivedBtn");
+            if (btn) { btn.disabled = true; btn.textContent = "Saving..."; }
+            try {
+                const response = await fetch("/admin/payment/cash-received/" + activePrintOrderId, { method: "POST", credentials: "same-origin" });
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.error || "Could not mark cash received.");
+                window.activeOrderPayment = { ...(window.activeOrderPayment || {}), method: "cash", status: "paid" };
+                renderAdminPayment(window.activeOrderPayment);
+                showQfpActionToast("Cash Payment Received", "Cash payment has been marked as received successfully.");
+            } catch (error) {
+                if (btn) { btn.disabled = false; btn.textContent = "Mark Cash Received"; }
+                alert(error.message || "Could not update cash payment.");
+            }
+        }
+
+        function openPrintDocument(orderId, documentUrl, preferences, payment) {
+            activePrintOrderId = orderId;
+            window.activeOrderPayment = payment || null;
+            renderAdminPayment(payment || null);
+            printDocumentUrl = documentUrl;
+            allowPrintPopupClose = false;
+            completingOrder = false;
+
+            document.getElementById("printOrderId").textContent = orderId;
+            renderOrderPreferences(preferences || []);
+            const initialFrame = document.getElementById("printDocumentFrame");
+            if (initialFrame) {
+                initialFrame.src = "about:blank";
+                window.requestAnimationFrame(() => {
+                    const separator = documentUrl.includes("?") ? "&" : "?";
+                    initialFrame.src = documentUrl + separator + "preview_ts=" + Date.now();
+                });
+            }
+            document.getElementById("printDocumentPopup").style.display = "flex";
+            document.getElementById("printDocumentPopup").setAttribute("aria-hidden", "false");
+
+            // Put a history entry in place so the browser Back button can be
+            // intercepted while the document is being printed.
+            history.pushState({ printDocument: true, orderId: orderId }, "", window.location.href);
+            printHistoryStateActive = true;
+
+            window.addEventListener("beforeunload", printBeforeUnload);
+        }
+
+        function printBeforeUnload(event) {
+            if (activePrintOrderId && !allowPrintPopupClose && !completingOrder) {
+                event.preventDefault();
+                event.returnValue = "";
+                return "";
+            }
+        }
+
+        function requestPrintDocumentClose() {
+            if (!activePrintOrderId) {
+                return;
+            }
+
+            showPrintCompleteWarning();
+        }
+
+        function showPrintCompleteWarning() {
+            document.getElementById("printCompletePopup").style.display = "flex";
+            document.getElementById("printCompletePopup").setAttribute("aria-hidden", "false");
+        }
+
+        function closePrintCompleteWarning() {
+            // This closes only the warning. The document stays open.
+            document.getElementById("printCompletePopup").style.display = "none";
+            document.getElementById("printCompletePopup").setAttribute("aria-hidden", "true");
+        }
+
+        function updateTodayPagesPrinted(pages) {
+            const element = document.getElementById("totalPagesPrinted");
+            if (!element) return;
+            const current = parseInt(element.textContent.trim(), 10) || 0;
+            element.textContent = current + (parseInt(pages, 10) || 0);
+        }
+
+        function updateTodayRevenue(amount) {
+            const element = document.getElementById("totalRevenue");
+            if (!element) return;
+
+            const current = parseFloat(element.textContent.replace(/[^0-9.-]/g, "")) || 0;
+            const added = parseFloat(amount) || 0;
+            element.textContent = "₹" + (current + added).toFixed(2);
+        }
+
+        async function sendCompletedNotification() {
+            if (!activePrintOrderId || completingOrder) {
+                return;
+            }
+
+            completingOrder = true;
+            const orderId = activePrintOrderId;
+            const button = document.querySelector(".print-complete-notify-btn");
+            if (button) {
+                button.disabled = true;
+                button.textContent = "Sending...";
+            }
+
+            try {
+                const response = await fetch(
+                    "{{ url_for('update_order', order_id=0, status='completed') }}".replace("/0/", "/" + orderId + "/"),
+                    { method: "POST" }
+                );
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || "Could not complete the order.");
+                }
+
+                allowPrintPopupClose = true;
+                closePrintCompleteWarning();
+                closePrintDocument();
+                updateTodayOrderCount("completed");
+                updateTodayPagesPrinted(data.pages_printed || 0);
+            } catch (error) {
+                completingOrder = false;
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = "Send Notification";
+                }
+                alert(error.message || "Could not send notification.");
+            }
+        }
+
+        function closePrintDocument() {
+            document.getElementById("printDocumentPopup").style.display = "none";
+            document.getElementById("printDocumentPopup").setAttribute("aria-hidden", "true");
+            document.getElementById("printDocumentFrame").src = "about:blank";
+
+            window.removeEventListener("beforeunload", printBeforeUnload);
+
+            if (printHistoryStateActive) {
+                history.back();
+                printHistoryStateActive = false;
+            }
+
+            activePrintOrderId = null;
+            printDocumentUrl = null;
+            allowPrintPopupClose = false;
+            completingOrder = false;
+        }
+
+        window.addEventListener("popstate", function() {
+            if (activePrintOrderId && !allowPrintPopupClose && !completingOrder) {
+                // Restore the print state so Back does not close the document.
+                history.pushState({ printDocument: true, orderId: activePrintOrderId }, "", window.location.href);
+                showPrintCompleteWarning();
+            }
+        });
+
+        function confirmLogout(event) {
+            event.preventDefault();
+            document.getElementById("logoutPopup").style.display = "flex";
+        }
+
+        function closeLogoutPopup() {
+            document.getElementById("logoutPopup").style.display = "none";
+        }
+
+        function logoutUser() {
+            window.location.href = "{{ url_for('logout') }}";
+        }
+
+        document.getElementById("logoutPopup").addEventListener("click", function(event) {
+            if (event.target === this) {
+                closeLogoutPopup();
+            }
+        });
+
+    </script>
+
+
+
+<script>
+// Refresh-safe admin printing workspace. The server reconstructs the active
+// accepted order from the database/session after every browser reload.
+window.qfpActivePrintRecovery = {{ (active_print_order or {}) | tojson }};
+window.addEventListener("DOMContentLoaded", function () {
+    const active = window.qfpActivePrintRecovery;
+    if (!active || !active.order_id || !active.document_url) return;
+    openPrintDocument(
+        active.order_id,
+        active.delivery_pdf_url || active.document_url,
+        active.preferences || [],
+        active.payment || null
+    );
+});
+</script>
+
+
+<script>
+/* ================= LIVE ADMIN ORDER UPDATES ================= */
+(function () {
+    let lastPendingOrderIds = new Set(
+        Array.from(document.querySelectorAll('#pendingOrdersBody tr[id^="order-row-"]'))
+            .map(row => row.id.replace('order-row-', ''))
+            .filter(Boolean)
+    );
+    // A row is removed only after it is missing from TWO consecutive
+    // successful server checks. This prevents temporary API/network states
+    // from causing the visible table to flicker, while still reflecting
+    // student cancellations and admin accept/decline actions automatically.
+    const missingOrderChecks = new Map();
+    let liveOrderBusy = false;
+
+    function escapeLiveHtml(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[ch]));
+    }
+
+    function buildLivePendingOrderRow(order) {
+        const row = document.createElement('tr');
+        row.id = `order-row-${Number(order.order_id)}`;
+        row.className = 'qfp-live-order-row';
+        row.innerHTML = `
+            <td>#${Number(order.order_id)}</td>
+            <td>${escapeLiveHtml(order.customer)}</td>
+            <td>${escapeLiveHtml(order.document)}</td>
+            <td>
+                <div class="action-buttons">
+                    <form method="POST" action="/admin/order/${Number(order.order_id)}/accepted" class="order-action-form" data-order-id="${Number(order.order_id)}" onsubmit="return acceptOrder(this);">
+                        <button type="submit" class="accept-btn">Accept</button>
+                    </form>
+                    <form method="POST" action="/admin/order/${Number(order.order_id)}/declined" class="order-action-form" onsubmit="return declineOrder(this);">
+                        <button type="submit" class="decline-btn">Decline</button>
+                    </form>
+                </div>
+            </td>
+        `;
+        return row;
+    }
+
+    function updateExistingLiveOrderRow(order) {
+        const row = document.getElementById(`order-row-${Number(order.order_id)}`);
+        if (!row) return;
+        const cells = row.querySelectorAll('td');
+        if (cells[1]) cells[1].textContent = String(order.customer ?? 'Student');
+        if (cells[2]) cells[2].textContent = String(order.document ?? 'Document');
+    }
+
+    function renderLivePendingOrders(orders) {
+        const body = document.getElementById('pendingOrdersBody');
+        if (!body) return;
+
+        // Update edited orders in place. No table rebuild and no flicker.
+        orders.forEach(updateExistingLiveOrderRow);
+
+        if (orders.length) {
+            const empty = body.querySelector('.qfp-empty-orders');
+            if (empty) empty.remove();
+        }
+
+        orders.forEach(order => {
+            const id = String(order.order_id);
+            if (document.getElementById(`order-row-${id}`)) return;
+            const row = buildLivePendingOrderRow(order);
+            body.insertBefore(row, body.firstChild);
+            row.classList.add('qfp-new-order-row');
+            setTimeout(() => row.classList.remove('qfp-new-order-row'), 1200);
+        });
+
+        if (!orders.length && !body.querySelector('tr[id^="order-row-"]') && !body.querySelector('.qfp-empty-orders')) {
+            const empty = document.createElement('tr');
+            empty.className = 'qfp-empty-orders';
+            empty.innerHTML = '<td colspan="4" style="text-align:center; padding:30px;">No orders available for your shop.</td>';
+            body.appendChild(empty);
+        }
+    }
+
+    async function refreshLivePendingOrders() {
+        if (liveOrderBusy || document.hidden) return;
+        liveOrderBusy = true;
+        try {
+            const response = await fetch('/admin/orders/pending', {
+                credentials: 'same-origin', cache: 'no-store', headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (!data.success || !Array.isArray(data.orders)) return;
+
+            const currentIds = new Set(data.orders.map(o => String(o.order_id)));
+            const newOrders = data.orders.filter(o => !lastPendingOrderIds.has(String(o.order_id)));
+            if (newOrders.length) {
+                newOrders.forEach(o => showQfpActionToast('New Print Order', `Order #${o.order_id} from ${o.customer} has arrived.`));
+            }
+
+            renderLivePendingOrders(data.orders);
+
+            // Silently remove orders that have really disappeared from the
+            // server. Two consecutive successful misses are required.
+            // This is what makes a student's cancellation appear on the
+            // admin screen without reloading and without flicker.
+            document.querySelectorAll('#pendingOrdersBody tr[id^="order-row-"]').forEach(row => {
+                const id = row.id.replace('order-row-', '');
+                if (currentIds.has(id)) {
+                    missingOrderChecks.delete(id);
+                    return;
+                }
+                const misses = (missingOrderChecks.get(id) || 0) + 1;
+                missingOrderChecks.set(id, misses);
+                if (misses >= 2) {
+                    row.remove();
+                    missingOrderChecks.delete(id);
+                    showQfpActionToast('Order Updated', `Order #${id} is no longer pending.`);
+                }
+            });
+
+            const body = document.getElementById('pendingOrdersBody');
+            if (body && !body.querySelector('tr[id^="order-row-"]') && !body.querySelector('.qfp-empty-orders')) {
+                const empty = document.createElement('tr');
+                empty.className = 'qfp-empty-orders';
+                empty.innerHTML = '<td colspan="4" style="text-align:center; padding:30px;">No orders available for your shop.</td>';
+                body.appendChild(empty);
+            }
+
+            lastPendingOrderIds = currentIds;
+        } catch (error) {
+            // Silent retry: temporary network errors should not disturb the dashboard.
+        } finally {
+            liveOrderBusy = false;
+        }
+    }
+
+    window.showQfpActionToast = function (title, message) {
+        const toast = document.getElementById('qfpCashToast');
+        const titleEl = document.getElementById('qfpCashToastTitle');
+        const msgEl = document.getElementById('qfpCashToastMessage');
+        if (!toast) return;
+        if (titleEl) titleEl.textContent = title;
+        if (msgEl) msgEl.textContent = message;
+        toast.classList.add('show');
+        clearTimeout(window.qfpToastTimer);
+        window.qfpToastTimer = setTimeout(() => toast.classList.remove('show'), 4500);
+    };
+
+    window.hideQfpActionToast = function () {
+        const toast = document.getElementById('qfpCashToast');
+        if (toast) toast.classList.remove('show');
+    };
+
+    // Silent background check every 2 seconds. The page is never reloaded and
+    // existing rows are not rebuilt, so there is no visible refresh/flicker.
+    window.addEventListener('DOMContentLoaded', function () {
+        // Background-only polling. The page itself is never reloaded.
+        // Payment must be selected first, so a freshly clicked Place Order
+        // stays invisible to the admin until the student reaches the
+        // successful payment/cash-selection screen.
+        setTimeout(refreshLivePendingOrders, 1200);
+        setInterval(refreshLivePendingOrders, 3000);
+    });
+})();
+</script>
+
+</body>
+
+</html>

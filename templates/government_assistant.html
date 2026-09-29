@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Government Document Assistant | Queue-Free Print</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='government_assistant.css') }}">
+</head>
+<body>
+<nav>
+    <div class="logo">Queue-Free <span>Print</span></div>
+    <div class="nav-links">
+        <a href="{{ url_for('user_dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('delivery_scan') }}">Scan QR</a>
+        <a href="{{ url_for('recent_orders') }}">Recent Orders</a>
+        <a href="{{ url_for('profile') }}">Profile</a>
+        <a href="{{ url_for('government_assistant') }}" class="active">Govt. Assistant</a>
+        <a href="#" onclick="confirmLogout(event)">Logout</a>
+    </div>
+</nav>
+
+<main class="assistant-page">
+    <section class="hero">
+        <div class="eyebrow">QUEUE-FREE PRINT · GOVERNMENT SERVICES</div>
+        <h1>AI Government Document Assistant</h1>
+        <p>Understand which government document or service you need, what you may need to submit, and where to apply.</p>
+        <div class="trust-note">
+            <span>✓</span>
+            <div><strong>Official-source focused</strong><br>QueueFree explains the process and links you to government portals. It does not issue or submit government documents.</div>
+        </div>
+    </section>
+
+    <section class="assistant-card">
+        <div class="card-heading">
+            <div>
+                <h2>What do you need help with?</h2>
+                <p>Ask in normal language. For example, “I need to apply for a caste certificate. What documents do I need?”</p>
+            </div>
+        </div>
+
+        <div class="suggestions">
+            <button type="button" onclick="useSuggestion('I need to apply for a caste certificate. What documents do I need?')">Caste Certificate</button>
+            <button type="button" onclick="useSuggestion('How can I apply for an income certificate? What documents are required?')">Income Certificate</button>
+            <button type="button" onclick="useSuggestion('How do I apply for a domicile or residence certificate?')">Domicile / Residence</button>
+            <button type="button" onclick="useSuggestion('How can I download an official document from DigiLocker?')">DigiLocker</button>
+        </div>
+
+        <textarea id="govQuestion" maxlength="2000" placeholder="Type your government document or service question..." aria-label="Government document question"></textarea>
+        <div class="input-footer">
+            <span id="charCount">0 / 2000</span>
+            <button type="button" id="askButton" onclick="askGovernmentAssistant()">Ask Assistant</button>
+        </div>
+
+        <div id="assistantError" class="error-box" hidden></div>
+        <div id="loading" class="loading" hidden>
+            <div class="loader"></div>
+            <span>Checking the government-service guidance...</span>
+        </div>
+    </section>
+
+    <section id="answerCard" class="answer-card" hidden>
+        <div class="answer-header">
+            <div>
+                <div class="answer-label">AI GUIDANCE</div>
+                <h2 id="answerTitle"></h2>
+            </div>
+            <span id="answerRoute" class="route-badge"></span>
+        </div>
+
+        <p id="answerSummary" class="answer-summary"></p>
+
+        <div class="answer-grid">
+            <div class="answer-section" id="eligibilitySection">
+                <h3>Eligibility / Conditions</h3>
+                <ul id="eligibilityList"></ul>
+            </div>
+            <div class="answer-section">
+                <h3>Documents You May Need</h3>
+                <ul id="documentsList"></ul>
+            </div>
+            <div class="answer-section">
+                <h3>How to Apply</h3>
+                <ol id="stepsList"></ol>
+            </div>
+            <div class="answer-section" id="printingSection">
+                <h3>Printing / Scanning</h3>
+                <ul id="printingList"></ul>
+            </div>
+        </div>
+
+        <div class="sources">
+            <h3>Official Government Sources</h3>
+            <div id="sourcesList" class="source-list"></div>
+        </div>
+
+        <div class="disclaimer" id="answerDisclaimer"></div>
+    </section>
+
+    <section class="bottom-note">
+        <strong>Important:</strong> Government requirements and portals can change. Always verify the latest requirements on the official source before submitting an application.
+    </section>
+</main>
+
+<script>
+function confirmLogout(event) {
+    event.preventDefault();
+    if (confirm("Are you sure you want to logout?")) {
+        window.location.href = "{{ url_for('logout') }}";
+    }
+}
+
+const questionInput = document.getElementById("govQuestion");
+const charCount = document.getElementById("charCount");
+questionInput.addEventListener("input", () => {
+    charCount.textContent = `${questionInput.value.length} / 2000`;
+});
+
+function useSuggestion(text) {
+    questionInput.value = text;
+    charCount.textContent = `${text.length} / 2000`;
+    questionInput.focus();
+}
+
+questionInput.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        askGovernmentAssistant();
+    }
+});
+
+function setList(id, items, ordered=false) {
+    const list = document.getElementById(id);
+    list.innerHTML = "";
+    (items && items.length ? items : ["No specific information provided. Verify on the official source."]).forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        list.appendChild(li);
+    });
+}
+
+function showAnswer(answer) {
+    document.getElementById("answerTitle").textContent = answer.title || "Government Document / Service";
+    document.getElementById("answerSummary").textContent = answer.summary || "";
+    document.getElementById("answerRoute").textContent = answer.route || "Official route";
+    setList("eligibilityList", answer.eligibility);
+    setList("documentsList", answer.documents);
+    setList("stepsList", answer.steps);
+    setList("printingList", answer.printing_requirements);
+
+    const sourceList = document.getElementById("sourcesList");
+    sourceList.innerHTML = "";
+    (answer.sources || []).forEach(source => {
+        const a = document.createElement("a");
+        a.href = source.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.className = "source-card";
+        const name = document.createElement("strong");
+        name.textContent = source.name || "Official government source";
+        const url = document.createElement("span");
+        url.textContent = source.url;
+        a.appendChild(name);
+        a.appendChild(url);
+        sourceList.appendChild(a);
+    });
+
+    document.getElementById("answerDisclaimer").textContent =
+        answer.disclaimer || "Verify the latest details on the official government source.";
+    document.getElementById("answerCard").hidden = false;
+    document.getElementById("answerCard").scrollIntoView({behavior: "smooth", block: "start"});
+}
+
+async function askGovernmentAssistant() {
+    const question = questionInput.value.trim();
+    const errorBox = document.getElementById("assistantError");
+    const answerCard = document.getElementById("answerCard");
+    const loading = document.getElementById("loading");
+    const button = document.getElementById("askButton");
+
+    errorBox.hidden = true;
+    if (!question) {
+        errorBox.textContent = "Please enter a government document or service question.";
+        errorBox.hidden = false;
+        questionInput.focus();
+        return;
+    }
+
+    button.disabled = true;
+    loading.hidden = false;
+    answerCard.hidden = true;
+
+    try {
+        const response = await fetch("{{ url_for('government_assistant') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            credentials: "same-origin",
+            body: JSON.stringify({question})
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            const sourceHint = (data.sources || []).map(s => `${s.name}: ${s.url}`).join("\n");
+            throw new Error((data.error || "Unable to get an answer.") + (sourceHint ? "\n\nOfficial starting points:\n" + sourceHint : ""));
+        }
+        showAnswer(data.answer);
+    } catch (error) {
+        errorBox.textContent = error.message || "Unable to get an answer right now.";
+        errorBox.hidden = false;
+    } finally {
+        button.disabled = false;
+        loading.hidden = true;
+    }
+}
+</script>
+</body>
+</html>
