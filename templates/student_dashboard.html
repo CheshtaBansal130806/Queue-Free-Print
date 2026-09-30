@@ -70,6 +70,7 @@ window.addEventListener("pageshow", async function (event) {
     <script src="{{ url_for('static', filename='nearby_shops.js') }}" defer></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='government_assistant_widget.css') }}">
     <script src="{{ url_for('static', filename='government_assistant_widget.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='site_consistency.css') }}">
 </head>
 
 
@@ -213,7 +214,7 @@ window.addEventListener("pageshow", async function (event) {
                 <input
                     type="file"
                     id="document-file"
-                    accept="*/*"
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png,.txt,.zip,.rar"
                     multiple
                 >
 
@@ -223,7 +224,7 @@ window.addEventListener("pageshow", async function (event) {
 
                     <h4>Upload your documents</h4>
 
-                    <p>Select one or more document/file types</p>
+                    <p>PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, JPG, JPEG, PNG, TXT, ZIP, RAR • Max 50 MB/file • 3 files/order</p>
 
                 </div>
 
@@ -1219,8 +1220,21 @@ if (documentInput) {
     documentInput.addEventListener("change", function () {
         const newFiles = Array.from(this.files || []);
         if (!newFiles.length) return;
+        const allowed = new Set(["pdf","doc","docx","ppt","pptx","xls","xlsx","jpg","jpeg","png","txt","zip","rar"]);
+        const maxBytes = 50 * 1024 * 1024;
+        const totalBytes = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+        const valid = [];
+        for (const file of newFiles) {
+            const ext = (file.name.split(".").pop() || "").toLowerCase();
+            if (!allowed.has(ext)) { alert("Unsupported format. Allowed: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, JPG, JPEG, PNG, TXT, ZIP, RAR."); continue; }
+            if (file.size > maxBytes) { alert(file.name + " exceeds the 50 MB maximum."); continue; }
+            valid.push(file);
+        }
+        if (selectedFiles.length + valid.length > 3) { alert("You can upload a maximum of 3 files per order."); return; }
+        if (totalBytes + valid.reduce((sum, f) => sum + f.size, 0) > 150 * 1024 * 1024) { alert("The combined upload size cannot exceed 150 MB."); return; }
+        if (!valid.length) return;
 
-        selectedFiles = selectedFiles.concat(newFiles);
+        selectedFiles = selectedFiles.concat(valid);
         syncDocumentInput();
         resetDocumentAnalysis();
         renderUploadedDocuments();

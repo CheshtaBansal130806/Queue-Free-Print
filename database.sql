@@ -261,6 +261,8 @@ CREATE TABLE `orders` (
   `delivery_token` varchar(128) DEFAULT NULL,
   `delivery_pdf_path` varchar(500) DEFAULT NULL,
   `delivered_at` timestamp NULL DEFAULT NULL,
+  `edit_count` tinyint unsigned NOT NULL DEFAULT '0',
+  `last_edited_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`order_id`),
   KEY `fk_order_user` (`user_id`),
   KEY `fk_order_shop` (`shop_id`),

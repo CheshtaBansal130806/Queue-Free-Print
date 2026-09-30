@@ -68,6 +68,7 @@ window.addEventListener("pageshow", async function (event) {
     <link rel="stylesheet" href="../static/responsive.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='nearby_shops.css') }}">
     <script src="{{ url_for('static', filename='nearby_shops.js') }}" defer></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='site_consistency.css') }}">
 </head>
 
 
@@ -271,17 +272,27 @@ window.addEventListener("pageshow", async function (event) {
                     </span>
 
                     <div class="order-actions">
-                        {% if order.order_status == 'pending' %}
+                        {% if order.order_status == 'pending' and (order.edit_count|default(0)|int) == 0 %}
                         <button class="edit-order-btn"
                                 onclick="openEditOrder({{ order.order_id }})">
                             ✎ Edit Order
                         </button>
                         {% endif %}
 
+                        {% if order.order_status == 'pending' %}
                         <button class="cancel-order-btn"
                                 onclick="cancelOrder({{ order.order_id }})">
                             ✕ Cancel Order
                         </button>
+                        {% endif %}
+
+                        {% if order.order_status in ['accepted', 'printing', 'ready'] %}
+                        <button class="scan-qr-order-btn"
+                                type="button"
+                                onclick="openQRScanner(event)">
+                            Scan QR
+                        </button>
+                        {% endif %}
 
                         <button class="details-btn"
                                 onclick="showDetails({{ order.order_id }})">
@@ -569,7 +580,7 @@ window.addEventListener("pageshow", async function (event) {
   <div class="qfp-edit-box">
     <div class="qfp-edit-head"><div><span class="qfp-edit-eyebrow">EDIT PENDING ORDER</span><h2>Edit Order <span id="editOrderIdLabel"></span></h2><p>Modify this order without changing its queue position.</p></div><button type="button" onclick="closeEditOrder()">×</button></div>
     <div id="editOrderError" class="qfp-edit-error" style="display:none"></div>
-    <div class="qfp-edit-docs"><div class="qfp-edit-section-title">Documents</div><div id="editExistingDocs"></div><label class="qfp-add-doc"><span>＋ Add Document</span><input id="editNewDocuments" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.webp,.bmp,.gif,.tif,.tiff"></label><div id="editNewDocsList"></div></div>
+    <div class="qfp-edit-docs"><div class="qfp-edit-section-title">Documents</div><div id="editExistingDocs"></div><label class="qfp-add-doc"><span>＋ Add Document</span><input id="editNewDocuments" type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.jpg,.jpeg,.png,.txt,.zip,.rar"></label><div id="editNewDocsList"></div></div>
     <div class="qfp-edit-grid">
       <label>Copies<input id="editCopies" type="number" min="1" value="1"></label>
       <label>Color<select id="editColor"><option value="black_white">Black & White</option><option value="color">Color</option></select></label>
@@ -1268,7 +1279,18 @@ document.addEventListener('change',e=>{
   if(e.target.id!=='editNewDocuments')return;
   const picked=Array.from(e.target.files||[]);
   if(picked.length){
-    picked.forEach(f=>{editNewFiles.push(f);editNewAnalyses.push(null);});
+    const allowed=new Set(["pdf","doc","docx","ppt","pptx","xls","xlsx","jpg","jpeg","png","txt","zip","rar"]);
+    const maxBytes=50*1024*1024;
+    const existingCount=(editOrderState?.items||[]).filter(x=>!(editOrderState.removed||[]).includes(Number(x.item_id))).length;
+    const valid=picked.filter(f=>{
+      const ext=(f.name.split(".").pop()||"").toLowerCase();
+      if(!allowed.has(ext)){alert("Unsupported format.");return false;}
+      if(f.size>maxBytes){alert(f.name+" exceeds the 50 MB maximum.");return false;}
+      return true;
+    });
+    if(existingCount+editNewFiles.length+valid.length>3){alert("An order can contain a maximum of 3 files.");return;}
+    if(editNewFiles.reduce((s,f)=>s+f.size,0)+valid.reduce((s,f)=>s+f.size,0)>150*1024*1024){alert("The combined upload size cannot exceed 150 MB.");return;}
+    valid.forEach(f=>{editNewFiles.push(f);editNewAnalyses.push(null);});
     renderNewDocs();
     document.getElementById('editAiStatus').textContent=`${picked.length} document(s) added. Starting fast analysis...`;
     // Analyze immediately so the user does not have to wait/click again.

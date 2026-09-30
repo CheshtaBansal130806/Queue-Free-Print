@@ -15,6 +15,9 @@ import shutil
 import tempfile
 import secrets
 import io
+import html
+import zipfile
+import csv
 import hmac
 import hashlib
 import requests
@@ -61,6 +64,21 @@ except ImportError:
     Image = None
 
 try:
+    from docx import Document as DocxDocument
+except ImportError:
+    DocxDocument = None
+
+try:
+    from openpyxl import load_workbook
+except ImportError:
+    load_workbook = None
+
+try:
+    from pptx import Presentation
+except ImportError:
+    Presentation = None
+
+try:
     from pywebpush import webpush, WebPushException
 except ImportError:
     webpush = None
@@ -73,6 +91,16 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_urlsafe(48)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.getenv("COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+# Upload policy: keep uploads practical for students while protecting storage/memory.
+MAX_UPLOAD_FILE_BYTES = 50 * 1024 * 1024
+MAX_UPLOAD_FILES = 3
+MAX_UPLOAD_TOTAL_BYTES = 150 * 1024 * 1024
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx",
+    ".jpg", ".jpeg", ".png", ".txt", ".zip", ".rar",
+}
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_TOTAL_BYTES + (5 * 1024 * 1024)  # multipart overhead
 
 
 # ============================================================
@@ -296,9 +324,7 @@ DIRECT_ANALYSIS_MIMES = {
 }
 
 CONVERTIBLE_EXTENSIONS = {
-    ".doc", ".docx", ".docm", ".dot", ".dotx", ".xls", ".xlsx", ".xlsm",
-    ".xlt", ".xltx", ".ppt", ".pptx", ".pptm", ".pps", ".ppsx",
-    ".odt", ".ods", ".odp", ".odg", ".rtf", ".txt", ".csv", ".html", ".htm",
+    ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".txt", ".zip", ".rar",
 }
 
 
@@ -971,7 +997,13 @@ def ensure_edit_tracking_schema(cursor):
     """)
     if not cursor.fetchone():
         cursor.execute("ALTER TABLE orders ADD COLUMN last_edited_at TIMESTAMP NULL DEFAULT NULL")
-
+    cursor.execute("""
+        SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders'
+          AND COLUMN_NAME = 'edit_count'
+    """)
+    if not cursor.fetchone():
+        cursor.execute("ALTER TABLE orders ADD COLUMN edit_count TINYINT UNSIGNED NOT NULL DEFAULT 0")
 
 def ensure_delivery_schema(cursor):
     """Add secure QR-delivery fields and the delivered status to an existing database."""
@@ -1053,37 +1085,131 @@ def _find_soffice():
     return next((x for x in candidates if x and Path(x).exists()), None)
 
 
+def _fallback_document_pdf(source_path):
+    """Create a software-free printable PDF fallback from common document formats."""
+    if not canvas or A4 is None:
+        raise RuntimeError("ReportLab is required for software-free document preview.")
+    path = Path(source_path)
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+
+    out_dir = Path(tempfile.mkdtemp(prefix="queuefree_fallback_"))
+    out = out_dir / f"{path.stem}_preview.pdf"
+    styles = getSampleStyleSheet()
+    story = [Paragraph(f"QueueFree Print Preview — {html.escape(path.name)}", styles["Title"]), Spacer(1, 8 * mm)]
+
+    def add_text(text):
+        text = str(text or "").strip()
+        if text:
+            safe = html.escape(text).replace("\\n", "<br/>")
+            story.append(Paragraph(safe, styles["BodyText"]))
+            story.append(Spacer(1, 3 * mm))
+
+    ext = path.suffix.lower()
+    if ext == ".docx" and DocxDocument:
+        doc = DocxDocument(str(path))
+        for para in doc.paragraphs:
+            add_text(para.text)
+        for table in doc.tables:
+            data = [[str(cell.text or "") for cell in row.cells] for row in table.rows]
+            if data:
+                tbl = Table(data, repeatRows=1)
+                tbl.setStyle(TableStyle([
+                    ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+                    ("VALIGN", (0,0), (-1,-1), "TOP"),
+                    ("FONTSIZE", (0,0), (-1,-1), 8),
+                    ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                ]))
+                story += [tbl, Spacer(1, 5 * mm)]
+    elif ext == ".xlsx" and load_workbook:
+        wb = load_workbook(str(path), read_only=True, data_only=True)
+        for ws in wb.worksheets:
+            story.append(Paragraph(html.escape(ws.title), styles["Heading2"]))
+            data = []
+            for row in ws.iter_rows(values_only=True):
+                if not any(v is not None for v in row):
+                    continue
+                data.append([str(v if v is not None else "") for v in row])
+                if len(data) >= 500:
+                    break
+            if data:
+                tbl = Table(data, repeatRows=1)
+                tbl.setStyle(TableStyle([
+                    ("GRID", (0,0), (-1,-1), 0.5, colors.grey),
+                    ("VALIGN", (0,0), (-1,-1), "TOP"),
+                    ("FONTSIZE", (0,0), (-1,-1), 7),
+                ]))
+                story += [tbl, Spacer(1, 5 * mm)]
+        wb.close()
+    elif ext == ".pptx" and Presentation:
+        prs = Presentation(str(path))
+        for i, slide in enumerate(prs.slides, 1):
+            story.append(Paragraph(f"Slide {i}", styles["Heading2"]))
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    add_text(shape.text)
+            story.append(PageBreak())
+    elif ext == ".txt":
+        text = path.read_text(encoding="utf-8", errors="replace")
+        add_text(text)
+    elif ext == ".zip":
+        try:
+            with zipfile.ZipFile(path) as z:
+                story.append(Paragraph("ZIP archive contents", styles["Heading2"]))
+                for name in z.namelist()[:1000]:
+                    add_text(name)
+        except Exception as exc:
+            add_text(f"Could not inspect ZIP archive: {exc}")
+    elif ext == ".rar":
+        add_text("RAR archive uploaded successfully. A RAR extraction engine is not bundled with QueueFree, so the archive is shown as a file record rather than extracted pages.")
+    else:
+        add_text(
+            f"{path.suffix.upper().lstrip('.') or 'FILE'} file uploaded successfully. "
+            "This software-free fallback can display the file record, but exact legacy Office page rendering "
+            "requires an Office-compatible conversion engine."
+        )
+
+    doc = SimpleDocTemplate(str(out), pagesize=A4, rightMargin=14*mm, leftMargin=14*mm, topMargin=14*mm, bottomMargin=14*mm)
+    doc.build(story)
+    return out, out_dir
+
+
 def _printable_pdf(source_path):
-    """Return a PDF path for PDF/image/Office files. Temporary conversions are cleaned later."""
+    """Return a PDF path. LibreOffice is preferred when present; otherwise use a
+    software-free Python fallback so the admin laptop does not need Office/LibreOffice."""
     source_path = Path(source_path)
     if source_path.suffix.lower() == ".pdf":
         return source_path, None
 
     temp_dir = Path(tempfile.mkdtemp(prefix="queuefree_print_"))
     try:
-        # Images can be converted without LibreOffice.
-        if Image and source_path.suffix.lower() in {".png",".jpg",".jpeg",".webp",".bmp",".gif",".tif",".tiff"}:
+        if Image and source_path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
             out = temp_dir / "image.pdf"
             with Image.open(source_path) as img:
                 img.convert("RGB").save(out, "PDF", resolution=150.0)
             return out, temp_dir
 
         soffice = _find_soffice()
-        if not soffice:
-            raise RuntimeError("LibreOffice is required to prepare non-PDF print documents.")
-        profile = temp_dir / "lo_profile"
-        profile.mkdir()
-        subprocess.run([
-            soffice, f"-env:UserInstallation={profile.as_uri()}",
-            "--headless", "--convert-to", "pdf", "--outdir", str(temp_dir), str(source_path)
-        ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180, text=True)
-        pdfs = list(temp_dir.glob("*.pdf"))
-        if not pdfs:
-            raise RuntimeError(f"Could not convert {source_path.name} to PDF.")
-        return pdfs[0], temp_dir
+        if soffice:
+            profile = temp_dir / "lo_profile"
+            profile.mkdir()
+            subprocess.run([
+                soffice, f"-env:UserInstallation={profile.as_uri()}",
+                "--headless", "--convert-to", "pdf", "--outdir", str(temp_dir), str(source_path)
+            ], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180, text=True)
+            pdfs = list(temp_dir.glob("*.pdf"))
+            if pdfs:
+                return pdfs[0], temp_dir
+
+        # No LibreOffice/Office software: generate a readable/printable fallback.
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        return _fallback_document_pdf(source_path)
+
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
-        raise
+        return _fallback_document_pdf(source_path)
 
 
 def build_delivery_pdf(order_id, token, student, shop, order, items):
@@ -1962,6 +2088,7 @@ def user_dashboard():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
+        ensure_edit_tracking_schema(cursor)
 
         cursor.execute("""
             SELECT o.order_id, o.document, o.copies, o.color, o.orientation,
@@ -2720,6 +2847,113 @@ def analyze_edit_file_fast(file, model=None):
             pass
 
 
+def validate_upload_batch(files):
+    """Validate the QueueFree upload policy before any AI/storage work."""
+    files = [f for f in (files or []) if f and f.filename]
+    if not files:
+        raise ValueError("Please upload at least one document.")
+    if len(files) > MAX_UPLOAD_FILES:
+        raise ValueError(f"You can upload a maximum of {MAX_UPLOAD_FILES} files per order.")
+
+    total = 0
+    for file in files:
+        name = secure_filename(file.filename) or "document"
+        ext = Path(name).suffix.lower()
+        if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+            raise ValueError("Unsupported file format. Allowed: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, JPG, JPEG, PNG, TXT, ZIP, RAR.")
+        # Flask/Werkzeug does not expose size until the stream is read, so inspect
+        # the seekable upload stream without consuming it.
+        try:
+            pos = file.stream.tell()
+            file.stream.seek(0, os.SEEK_END)
+            size = file.stream.tell()
+            file.stream.seek(pos)
+        except Exception:
+            size = 0
+        if size > MAX_UPLOAD_FILE_BYTES:
+            raise ValueError(f"{name} exceeds the 50 MB maximum file size.")
+        total += size
+    if total > MAX_UPLOAD_TOTAL_BYTES:
+        raise ValueError("The combined upload size cannot exceed 150 MB per order.")
+    return files
+
+
+def _office_preview_html(file_path):
+    """Create a browser-renderable preview without requiring LibreOffice.
+
+    This is a lightweight fallback for the admin printing popup. It preserves
+    readable text/tables/images where Python can parse them. If LibreOffice is
+    available, the normal PDF conversion path remains preferred because it
+    preserves original office formatting more faithfully.
+    """
+    path = Path(file_path)
+    ext = path.suffix.lower()
+    title = html.escape(path.name)
+    body = []
+
+    if ext == ".docx" and DocxDocument:
+        doc = DocxDocument(str(path))
+        for para in doc.paragraphs:
+            text = para.text.strip()
+            if text:
+                body.append(f"<p>{html.escape(text)}</p>")
+        for table in doc.tables:
+            rows = []
+            for row in table.rows:
+                cells = "".join(f"<td>{html.escape(cell.text)}</td>" for cell in row.cells)
+                rows.append(f"<tr>{cells}</tr>")
+            if rows:
+                body.append("<table><tbody>" + "".join(rows) + "</tbody></table>")
+        if not body:
+            body.append("<p>This DOCX contains no directly previewable text.</p>")
+
+    elif ext == ".xlsx" and load_workbook:
+        wb = load_workbook(str(path), read_only=True, data_only=True)
+        for ws in wb.worksheets:
+            body.append(f"<h2>{html.escape(ws.title)}</h2><table>")
+            row_count = 0
+            for row in ws.iter_rows(values_only=True):
+                if not any(v is not None for v in row):
+                    continue
+                cells = "".join(f"<td>{html.escape(str(v if v is not None else ''))}</td>" for v in row)
+                body.append(f"<tr>{cells}</tr>")
+                row_count += 1
+                if row_count >= 500:
+                    body.append("<tr><td colspan='20'>Preview limited to the first 500 non-empty rows.</td></tr>")
+                    break
+            body.append("</table>")
+        wb.close()
+
+    elif ext == ".pptx" and Presentation:
+        prs = Presentation(str(path))
+        for index, slide in enumerate(prs.slides, 1):
+            body.append(f"<section><h2>Slide {index}</h2>")
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    body.append(f"<p>{html.escape(shape.text.strip()).replace(chr(10), '<br>')}</p>")
+            body.append("</section>")
+        if not body:
+            body.append("<p>This PPTX contains no directly previewable text.</p>")
+
+    elif ext == ".txt":
+        text = path.read_text(encoding="utf-8", errors="replace")
+        body.append(f"<pre>{html.escape(text)}</pre>")
+
+    elif ext == ".zip":
+        with zipfile.ZipFile(path) as z:
+            names = z.namelist()[:1000]
+        body.append("<h2>ZIP contents</h2><ul>" + "".join(f"<li>{html.escape(n)}</li>" for n in names) + "</ul>")
+
+    else:
+        # Legacy binary Office formats and RAR cannot be faithfully rendered by
+        # the standard Python runtime alone. Still show a useful in-browser file
+        # card instead of forcing a download or failing the accepted order.
+        body.append(f"<div class='file-card'><h2>{title}</h2><p>Preview is available as a file card. This format can remain attached to the order without installing office software on the admin computer.</p><p>For exact page layout, PDF/DOCX/PPTX/XLSX are recommended.</p></div>")
+
+    return f"""<!doctype html><html><head><meta charset='utf-8'><title>{title}</title>
+<style>body{{font-family:Arial,sans-serif;margin:28px;color:#222;background:#fff}}h1,h2{{margin-top:0}}p{{line-height:1.5}}table{{border-collapse:collapse;width:100%;margin:16px 0}}td,th{{border:1px solid #bbb;padding:7px;vertical-align:top}}pre{{white-space:pre-wrap;word-break:break-word}}section{{page-break-after:always;margin-bottom:30px}}.file-card{{border:1px solid #ddd;padding:24px;border-radius:12px}}@media print{{body{{margin:12mm}}}}</style></head><body><h1>{title}</h1>{''.join(body)}</body></html>"""
+
+
 def analyze_uploaded_file(file, model=None):
     """Save and analyze one uploaded file, returning its Gemini analysis."""
     safe_name = secure_filename(file.filename) or "document"
@@ -2762,8 +2996,10 @@ def analyze_edit_documents():
         return {"success": False, "error": "Please login as a user."}, 401
 
     files = [f for f in request.files.getlist("documents") if f and f.filename]
-    if not files:
-        return {"success": False, "error": "Please select at least one document."}, 400
+    try:
+        files = validate_upload_batch(files)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}, 400
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
     results = [None] * len(files)
@@ -2792,8 +3028,10 @@ def analyze_documents():
         return {"success": False, "error": "Please login as a user."}, 401
 
     files = [f for f in request.files.getlist("documents") if f and f.filename]
-    if not files:
-        return {"success": False, "error": "Please select at least one document."}, 400
+    try:
+        files = validate_upload_batch(files)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}, 400
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -3041,8 +3279,10 @@ def place_order():
         single = request.files.get("document")
         if single and single.filename:
             files = [single]
-    if not files:
-        return {"success": False, "error": "Please upload at least one document."}, 400
+    try:
+        files = validate_upload_batch(files)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}, 400
 
     try:
         shop_id = int(request.form.get("shop_id", "0"))
@@ -3613,7 +3853,7 @@ def get_order_details_for_user(order_id):
             SELECT o.order_id, o.user_id, o.document, o.copies, o.color,
                    o.orientation, o.print_side, o.page_range, o.paper_type,
                    o.additional_requirements, o.estimated_cost,
-                   o.order_status, o.created_at,
+                   o.order_status, o.created_at, COALESCE(o.edit_count, 0) AS edit_count,
                    COALESCE((SELECT p2.payment_method FROM payments p2 WHERE p2.order_id=o.order_id AND p2.payment_status <> 'failed' ORDER BY p2.payment_id DESC LIMIT 1), 'unselected') AS payment_method,
                    COALESCE((SELECT p3.payment_status FROM payments p3 WHERE p3.order_id=o.order_id AND p3.payment_status <> 'failed' ORDER BY p3.payment_id DESC LIMIT 1), 'pending') AS payment_status,
                    s.shop_name, s.shop_number,
@@ -4136,12 +4376,8 @@ def cancel_order(order_id):
         if not order:
             return {"success": False, "error": "Order not found."}, 404
 
-        if order["order_status"] in ("completed", "delivered"):
-            return {"success": False, "error": "Completed orders cannot be cancelled."}, 400
-
-        # Idempotent: if a previous request already cancelled it, report success.
-        if order["order_status"] == "cancelled":
-            return {"success": True, "order_id": order_id, "status": "cancelled"}
+        if order["order_status"] != "pending":
+            return {"success": False, "error": "Only pending orders can be cancelled. Once the shop accepts an order, cancellation is no longer available."}, 400
 
         cursor.execute("""
             SELECT file_path
@@ -4194,10 +4430,11 @@ def edit_order_details(order_id):
     try:
         conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
         ensure_order_item_columns(cursor)
+        ensure_edit_tracking_schema(cursor)
         cursor.execute("""
             SELECT o.order_id, o.user_id, o.shop_id, o.document, o.copies, o.color,
                    o.orientation, o.print_side, o.page_range, o.paper_type,
-                   o.additional_requirements, o.estimated_cost, o.order_status,
+                   o.additional_requirements, o.estimated_cost, o.order_status, COALESCE(o.edit_count, 0) AS edit_count,
                    COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.order_id=o.order_id AND p.payment_status='paid'),0) AS paid_amount,
                    s.shop_name, s.shop_number
             FROM orders o LEFT JOIN print_shops s ON s.shop_id=o.shop_id
@@ -4208,6 +4445,8 @@ def edit_order_details(order_id):
             return {"success": False, "error": "Order not found."}, 404
         if order["order_status"] != "pending":
             return {"success": False, "error": "Only pending orders can be edited."}, 400
+        if int(order.get("edit_count") or 0) >= 1:
+            return {"success": False, "error": "This order has already been edited once. Further edits are not allowed."}, 400
         cursor.execute("""
             SELECT item_id, file_name, file_path, total_pages, blank_pages,
                    blurry_pages, unrecognizable_pages, copies, color, orientation,
@@ -4234,10 +4473,12 @@ def edit_order_cost(order_id):
         copies = max(1, int(request.form.get("copies", "1") or 1))
         paper_type = request.form.get("paper_type", "printing")
         conn = get_db_connection(); cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT order_id, shop_id, order_status FROM orders WHERE order_id=%s AND user_id=%s LIMIT 1", (order_id, session["user_id"]))
+        cursor.execute("SELECT order_id, shop_id, order_status, COALESCE(edit_count, 0) AS edit_count FROM orders WHERE order_id=%s AND user_id=%s LIMIT 1", (order_id, session["user_id"]))
         order = cursor.fetchone()
         if not order or order["order_status"] != "pending":
             return {"success": False, "error": "Only pending orders can be edited."}, 400
+        if int(order.get("edit_count") or 0) >= 1:
+            return {"success": False, "error": "This order has already been edited once."}, 400
         cursor.execute("SELECT item_id, total_pages FROM order_items WHERE order_id=%s ORDER BY item_id ASC", (order_id,))
         existing = cursor.fetchall()
         existing_pages = sum(max(0, int(x.get("total_pages") or 0)) for x in existing if int(x["item_id"]) not in removed_ids)
@@ -4261,6 +4502,11 @@ def save_edit_order(order_id):
         return {"success": False, "error": "Please login as a user."}, 401
 
     files = [f for f in request.files.getlist("documents") if f and f.filename]
+    if files:
+        try:
+            files = validate_upload_batch(files)
+        except ValueError as exc:
+            return {"success": False, "error": str(exc)}, 400
     try:
         removed_ids = [int(x) for x in json.loads(request.form.get("removed_item_ids", "[]"))]
         analyses = json.loads(request.form.get("analyses", "[]"))
@@ -4287,12 +4533,31 @@ def save_edit_order(order_id):
         order=cursor.fetchone()
         if not order: return {"success": False, "error": "Order not found."},404
         if order["order_status"] != "pending": return {"success": False, "error": "This order can no longer be edited because the shop has accepted it."},400
+        if int(order.get("edit_count") or 0) >= 1: return {"success": False, "error": "This order has already been edited once. Further edits are not allowed."},400
 
         cursor.execute("SELECT * FROM order_items WHERE order_id=%s ORDER BY item_id ASC", (order_id,))
         existing=cursor.fetchall()
         existing_ids={int(x["item_id"]) for x in existing}
         removed=set(removed_ids) & existing_ids
         remaining=[x for x in existing if int(x["item_id"]) not in removed]
+        if len(remaining) + len(files) > MAX_UPLOAD_FILES:
+            return {"success": False, "error": f"An order can contain a maximum of {MAX_UPLOAD_FILES} files."}, 400
+        existing_bytes = 0
+        for old_item in remaining:
+            old_path = _safe_upload_path(old_item.get("file_path"))
+            if old_path and old_path.is_file():
+                try:
+                    existing_bytes += old_path.stat().st_size
+                except OSError:
+                    pass
+        new_bytes = 0
+        for new_file in files:
+            try:
+                pos = new_file.stream.tell(); new_file.stream.seek(0, os.SEEK_END); new_bytes += new_file.stream.tell(); new_file.stream.seek(pos)
+            except Exception:
+                pass
+        if existing_bytes + new_bytes > MAX_UPLOAD_TOTAL_BYTES:
+            return {"success": False, "error": "The combined files in an order cannot exceed 150 MB."}, 400
         if not remaining and not files:
             return {"success": False, "error": "At least one document must remain in the order."},400
 
@@ -4356,9 +4621,12 @@ def save_edit_order(order_id):
         # order total used by the current application.
         cursor.execute("""
             UPDATE orders SET document=%s,copies=%s,color=%s,orientation=%s,print_side=%s,page_range=%s,
-                paper_type=%s,additional_requirements=%s,estimated_cost=%s,last_edited_at=NOW()
-            WHERE order_id=%s AND user_id=%s AND order_status='pending'
+                paper_type=%s,additional_requirements=%s,estimated_cost=%s,last_edited_at=NOW(),edit_count=1
+            WHERE order_id=%s AND user_id=%s AND order_status='pending' AND COALESCE(edit_count,0)=0
         """,(document_label,copies,color,orientation,print_side,page_range,paper_type,additional,str(new_cost),order_id,session["user_id"]))
+        if cursor.rowcount != 1:
+            conn.rollback()
+            return {"success": False, "error": "This order has already been edited once or is no longer pending."}, 409
 
         # Refresh the order-level analysis summary for the edited order.
         cursor.execute("SELECT COALESCE(SUM(blank_pages),0) AS blank_pages, COALESCE(SUM(blurry_pages),0) AS blurry_pages, COALESCE(SUM(unrecognizable_pages),0) AS unrecognizable_pages, COALESCE(SUM(total_pages),0) AS total_pages FROM order_items WHERE order_id=%s", (order_id,))
@@ -5641,67 +5909,42 @@ def open_order_document(order_id):
         cleanup_dir = None
 
         if mime_type not in browser_inline_mimes:
-            # Office/LibreOffice documents are not reliably rendered by browsers.
-            # Convert a temporary copy to PDF and serve that PDF inline in the
-            # existing iframe. Never fall back to sending the original Office
-            # file because that causes Chrome/Edge to download it.
-            output_dir = Path(tempfile.mkdtemp(prefix="queuefree_preview_"))
+            # Prefer a real PDF conversion when LibreOffice is present. If it is
+            # not installed on the admin laptop, generate a browser-renderable
+            # software-free fallback instead of failing the accepted order.
             try:
-                soffice_candidates = [
-                    shutil.which("soffice"),
-                    shutil.which("soffice.exe"),
-                    shutil.which("libreoffice"),
-                    shutil.which("libreoffice.exe"),
-                    r"C:\Program Files\LibreOffice\program\soffice.exe",
-                    r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-                ]
-                soffice = next((x for x in soffice_candidates if x and Path(x).exists()), None)
-                if not soffice:
-                    raise RuntimeError("LibreOffice/soffice was not found for document preview.")
-
-                # Use an isolated temporary user profile so an already-running
-                # LibreOffice process cannot lock or interfere with conversion.
-                lo_profile = output_dir / "lo_profile"
-                lo_profile.mkdir(parents=True, exist_ok=True)
-                subprocess.run(
-                    [
-                        soffice,
-                        f"-env:UserInstallation={lo_profile.as_uri()}",
-                        "--headless",
-                        "--convert-to", "pdf",
-                        "--outdir", str(output_dir),
-                        str(file_path),
-                    ],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    timeout=180,
-                    text=True,
-                )
-                converted = output_dir / f"{file_path.stem}.pdf"
-                if not converted.exists():
-                    pdfs = [x for x in output_dir.glob("*.pdf") if x.is_file()]
+                soffice = _find_soffice()
+                if soffice:
+                    output_dir = Path(tempfile.mkdtemp(prefix="queuefree_preview_"))
+                    lo_profile = output_dir / "lo_profile"
+                    lo_profile.mkdir(parents=True, exist_ok=True)
+                    subprocess.run(
+                        [soffice, f"-env:UserInstallation={lo_profile.as_uri()}",
+                         "--headless", "--convert-to", "pdf",
+                         "--outdir", str(output_dir), str(file_path)],
+                        check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        timeout=180, text=True,
+                    )
+                    pdfs = list(output_dir.glob("*.pdf"))
                     if pdfs:
-                        converted = pdfs[0]
-                if not converted.exists():
-                    raise RuntimeError("The document could not be converted to a preview PDF.")
-
-                preview_path = converted
-                preview_mime = "application/pdf"
-                cleanup_dir = output_dir
-            except Exception as preview_error:
-                # Do not send the original Office/binary document here: the
-                # browser would download it. Return a readable inline error
-                # instead, while leaving the original file untouched.
-                shutil.rmtree(output_dir, ignore_errors=True)
-                return (
-                    f"<html><body style='font-family:Arial;padding:30px'>"
-                    f"<h2>Preview unavailable</h2>"
-                    f"<p>{escape_html(str(preview_error))}</p>"
-                    f"</body></html>",
-                    500,
-                    {"Content-Type": "text/html; charset=utf-8", "Content-Disposition": "inline"},
-                )
+                        preview_path = pdfs[0]
+                        preview_mime = "application/pdf"
+                        cleanup_dir = output_dir
+                if preview_path == file_path:
+                    # Pure-Python HTML preview. No Office/LibreOffice installation.
+                    html_preview = _office_preview_html(file_path)
+                    response = app.response_class(html_preview, mimetype="text/html")
+                    response.headers["Content-Disposition"] = "inline"
+                    response.headers["X-Content-Type-Options"] = "nosniff"
+                    return response
+            except Exception:
+                # The original file remains safely stored; return the software-free
+                # HTML preview rather than a browser download.
+                html_preview = _office_preview_html(file_path)
+                response = app.response_class(html_preview, mimetype="text/html")
+                response.headers["Content-Disposition"] = "inline"
+                response.headers["X-Content-Type-Options"] = "nosniff"
+                return response
 
         response = send_file(
             preview_path,

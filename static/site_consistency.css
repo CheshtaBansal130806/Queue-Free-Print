@@ -1,0 +1,57 @@
+/* Queue-Free Print — shared visual consistency layer */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+nav { height:72px !important; min-height:72px !important; padding:0 6% !important; box-sizing:border-box !important; }
+nav .logo, nav .logo a { font-size:23px !important; line-height:1 !important; font-weight:700 !important; letter-spacing:-.35px !important; white-space:nowrap !important; }
+nav .logo span { font-weight:500 !important; }
+nav .nav-links { display:flex !important; align-items:center !important; justify-content:flex-end !important; gap:24px !important; }
+nav .nav-links a { font-family:inherit !important; font-size:14px !important; line-height:1.2 !important; font-weight:500 !important; letter-spacing:0 !important; text-decoration:none !important; white-space:nowrap !important; }
+nav .nav-links a.active, nav .nav-links a[aria-current="page"] { font-weight:650 !important; }
+h1,h2,h3,h4,h5,h6,p,label,input,select,textarea,button,th,td { font-family:inherit; }
+input,select,textarea { line-height:1.4; }
+button { line-height:1.25; }
+.error-box,.warning-box,.error-message,.warning-message,.alert,.alert-error,.alert-warning,.form-error,.field-error,.validation-error,.status-error,.status-warning { font-family:inherit; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+@media(max-width:900px){ nav{height:auto !important;min-height:64px !important;padding:13px 20px !important;gap:12px !important;} nav .logo{font-size:21px !important;} nav .nav-links{gap:12px !important;flex-wrap:wrap !important;} nav .nav-links a{font-size:13px !important;} }
+@media(max-width:600px){ nav{align-items:flex-start !important;} nav .logo{font-size:20px !important;} nav .nav-links{gap:9px 12px !important;} nav .nav-links a{font-size:12.5px !important;} }
+
+/* Emoji rendering: keep the original UI emojis visible across browsers. */
+:root { --qfp-emoji-font: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif; }
+.push-permission-icon,
+.service-icon,
+.choice-check,
+.payment-lock,
+.status-icon,
+.upload-icon,
+.uploaded-file-icon,
+.generic-preview-icon,
+.no-notification-emoji,
+.qfp-action-toast-icon,
+[class*="emoji"] {
+  font-family: var(--qfp-emoji-font);
+}
+
+/* Emoji-safe icon rendering: preserve the original emoji UI on Windows/Chrome. */
+.profile-avatar,
+.summary-icon,
+.notification-icon,
+.logout-icon,
+.warning-icon,
+.cancel-order-icon,
+.stat-icon,
+.order-confirm-icon,
+.print-complete-icon,
+.payment-method-icon,
+.payment-choice-icon,
+.wait-time-icon,
+.service-icon,
+.push-permission-icon,
+.upload-icon,
+.uploaded-file-icon,
+.generic-preview-icon,
+.no-notification-emoji,
+.status-icon,
+[class*="emoji"],
+[class*="icon"] {
+    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
+    font-variant-emoji: emoji;
+}
